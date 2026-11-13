@@ -98,7 +98,19 @@ kbd {
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
 }
-.brand { display: flex; align-items: center; gap: 10px; }
+.topbar-left { display: flex; align-items: center; gap: 24px; min-width: 0; }
+.brand { display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none; }
+.nav { display: flex; gap: 4px; }
+.nav-link {
+  padding: 7px 12px; border-radius: var(--radius-sm); text-decoration: none;
+  color: var(--muted); font-weight: 600; font-size: .92rem;
+}
+.nav-link:hover { color: var(--text); background: var(--surface-2); }
+.nav-link.active { color: var(--accent-ink); background: var(--accent); }
+@media (max-width: 600px) {
+  .topbar-left { gap: 10px; }
+  .brand h1 { display: none; }
+}
 .logo {
   display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px;
   background: var(--accent); color: var(--accent-ink);
