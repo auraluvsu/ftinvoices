@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import type { NewCategory, Receipt } from './types';
+import type { Category, Client, NewCategory, Receipt, ReceiptDraft } from './types';
 import type { ExportFormat } from './lib/export';
 import type { QuarterStagger } from './lib/quarters';
 
@@ -11,14 +11,18 @@ export interface Toast {
 }
 
 export interface AppData {
+  /** The client whose books are open. */
+  client: Client;
   receipts: Receipt[];
+  /** Category names for the open client, sorted with "Other" last. */
   categories: string[];
+  categoryList: Category[];
   /** Display colour for a category (hex). */
   categoryColor: (name: string) => string;
   stagger: QuarterStagger;
   setStagger: (s: QuarterStagger) => void;
-  /** Adds or updates a receipt. Returns false if it couldn't be saved. */
-  saveReceipt: (receipt: Receipt, newCategory?: NewCategory) => boolean;
+  /** Adds or updates a receipt (uploading any new image). Resolves false if it couldn't be saved. */
+  saveReceipt: (draft: ReceiptDraft, newCategory?: NewCategory) => Promise<boolean>;
   deleteReceipt: (receipt: Receipt) => void;
   exportList: (list: Receipt[], format: ExportFormat, label?: string) => Promise<void>;
   notify: (msg: string, kind?: Toast['kind'], undo?: () => void) => void;

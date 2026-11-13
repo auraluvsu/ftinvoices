@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import type { NewCategory, Receipt } from '../types';
+import type { NewCategory, Receipt, ReceiptDraft } from '../types';
 import { useAppData } from '../appData';
 import { groupByMonth, groupByYear, sumTotals } from '../lib/receipts';
 import { formatMoney } from '../lib/format';
@@ -12,7 +12,6 @@ import { EditReceiptModal } from '../components/EditReceiptModal';
 import { Stat } from '../components/Stat';
 
 const VIEW_KEY = 'ftinvoices.view';
-const STORAGE_LIMIT = 5 * 1024 * 1024; // typical browser localStorage quota
 type View = 'monthly' | 'quarterly';
 
 function readView(): View {
@@ -32,12 +31,9 @@ export function ReceiptsPage() {
   const years = useMemo(() => groupByYear(groupByMonth(receipts)), [receipts]);
   const newestMonth = years[0]?.months[0]?.key;
   const grand = useMemo(() => sumTotals(receipts), [receipts]);
-  // Rough size of what we store (UTF-16 → 2 bytes per char).
-  const usage = useMemo(() => JSON.stringify(receipts).length * 2, [receipts]);
-  const usagePct = Math.min(100, (usage / STORAGE_LIMIT) * 100);
 
-  const handleSave = (receipt: Receipt, newCategory?: NewCategory) => {
-    const ok = saveReceipt(receipt, newCategory);
+  const handleSave = async (draft: ReceiptDraft, newCategory?: NewCategory) => {
+    const ok = await saveReceipt(draft, newCategory);
     if (ok) setEditing(null);
     return ok;
   };
@@ -60,12 +56,6 @@ export function ReceiptsPage() {
     <main className="layout">
       <aside className="sidebar">
         <ReceiptForm categories={categories} editing={null} onSave={handleSave} onError={(m) => notify(m, 'error')} />
-        <div className={`storage${usagePct > 80 ? ' warn' : ''}`} title="Approximate browser storage used">
-          <div className="storage-bar">
-            <span style={{ width: `${usagePct}%` }} />
-          </div>
-          <span className="muted">Storage: {(usage / 1024 / 1024).toFixed(1)} MB of ~5 MB</span>
-        </div>
       </aside>
 
       <div className="content">

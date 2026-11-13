@@ -211,10 +211,6 @@ input[type='number']::-webkit-inner-spin-button { opacity: .4; }
 .image-preview-actions { display: flex; justify-content: flex-end; gap: 4px; padding: 6px; }
 
 /* ---------- Storage meter ---------- */
-.storage { display: flex; flex-direction: column; gap: 6px; padding: 0 4px; font-size: .8rem; }
-.storage-bar { height: 4px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
-.storage-bar span { display: block; height: 100%; background: var(--accent); border-radius: inherit; }
-.storage.warn .storage-bar span { background: var(--danger); }
 
 /* ---------- Summary ---------- */
 .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
@@ -633,3 +629,13 @@ input[type='number']::-webkit-inner-spin-button { opacity: .4; }
 }
 .account-btn img { width: 100%; height: 100%; object-fit: cover; }
 .account-email { padding: 8px 12px 6px; font-size: .8rem; color: var(--muted); border-bottom: 1px solid var(--border); margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 240px; }
+.spinner {
+  width: 32px; height: 32px; border-radius: 50%;
+  border: 3px solid var(--border); border-top-color: var(--chart);
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.first-client { display: flex; flex-direction: column; gap: 12px; width: 100%; text-align: left; }
+.first-client h1 { font-size: 1.3rem; margin: 0; text-align: center; }
+.first-client p { text-align: center; }
+.signin-foot { font-size: .8rem; margin: 12px 0 0 !important; }

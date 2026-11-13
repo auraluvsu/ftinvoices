@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { NewCategory, Receipt } from '../types';
+import type { NewCategory, Receipt, ReceiptDraft } from '../types';
 import { useAppData } from '../appData';
 import { newId, round2, todayIso } from '../lib/format';
 import { catVar, SUGGESTED_COLORS } from '../lib/color';
@@ -12,7 +12,7 @@ const UK_VAT_RATE = 0.2;
 interface Props {
   categories: string[];
   editing: Receipt | null;
-  onSave: (receipt: Receipt, newCategory?: NewCategory) => boolean;
+  onSave: (draft: ReceiptDraft, newCategory?: NewCategory) => Promise<boolean>;
   onCancelEdit?: () => void;
   onError: (msg: string) => void;
 }
@@ -54,6 +54,7 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
   // The parent remounts this form (via `key`) when switching between add/edit.
   const [draft, setDraft] = useState<Draft>(() => (editing ? fromReceipt(editing) : blank(categories[0])));
   const [errors, setErrors] = useState<Partial<Record<keyof Draft, string>>>({});
+  const [saving, setSaving] = useState(false);
   const { categoryColor } = useAppData();
   // Default a new category to the first suggested colour not already in use.
   const usedColors = new Set(categories.map(categoryColor));
@@ -75,8 +76,9 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
     set('vat', round2((t * UK_VAT_RATE) / (1 + UK_VAT_RATE)).toFixed(2));
   };
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving) return;
     const errs: typeof errors = {};
     const total = Number(draft.total);
     const vat = draft.vat.trim() === '' ? 0 : Number(draft.vat);
@@ -98,9 +100,8 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
     const existing = isNew ? categories.find((c) => c.toLowerCase() === category.toLowerCase()) : undefined;
     const finalCategory = existing ?? category;
 
-    const receipt: Receipt = {
+    const receipt: ReceiptDraft = {
       id: editing?.id ?? newId(),
-      createdAt: editing?.createdAt ?? Date.now(),
       name: draft.name.trim(),
       total: round2(total),
       vat: round2(vat),
@@ -109,7 +110,10 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
       image: draft.image,
     };
 
-    if (onSave(receipt, isNew && !existing ? { name: finalCategory, color: newColor } : undefined)) {
+    setSaving(true);
+    const ok = await onSave(receipt, isNew && !existing ? { name: finalCategory, color: newColor } : undefined);
+    setSaving(false);
+    if (ok && !editing) {
       // Keep the category and date — handy when entering a batch of receipts.
       setDraft((d) => ({ ...blank(finalCategory), date: d.date }));
     }
@@ -216,13 +220,13 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
           <button type="button" className="btn btn-secondary" onClick={onCancelEdit}>
             Cancel
           </button>
-          <button type="submit" className="btn btn-primary">
-            Save changes
+          <button type="submit" className="btn btn-primary" disabled={saving}>
+            {saving ? 'Saving…' : 'Save changes'}
           </button>
         </div>
       ) : (
-        <button type="submit" className="btn btn-primary btn-block">
-          Add receipt
+        <button type="submit" className="btn btn-primary btn-block" disabled={saving}>
+          {saving ? 'Saving…' : 'Add receipt'}
         </button>
       )}
     </form>

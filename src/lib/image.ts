@@ -2,8 +2,8 @@ const MAX_DIMENSION = 1600;
 const QUALITY = 0.75;
 
 /**
- * Downscale and re-encode an image as JPEG so receipts fit within the
- * ~5MB localStorage budget. Typical phone photos end up around 150–300KB.
+ * Downscale and re-encode an image as JPEG to keep uploads small.
+ * Typical phone photos end up around 150–300KB.
  */
 export async function compressImage(file: Blob): Promise<string> {
   const url = URL.createObjectURL(file);
@@ -50,4 +50,21 @@ export function imageFromDataTransfer(dt: DataTransfer | null): File | null {
     if (f.type.startsWith('image/')) return f;
   }
   return null;
+}
+
+/** Convert a `data:` URL to a Blob for uploading. */
+export async function dataUrlToBlob(dataUrl: string): Promise<Blob> {
+  return (await fetch(dataUrl)).blob();
+}
+
+/** Fetch any image URL and return it as a `data:` URL (used for JSON export). */
+export async function urlToDataUrl(url: string): Promise<string> {
+  if (url.startsWith('data:')) return url;
+  const blob = await (await fetch(url)).blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
 }

@@ -246,8 +246,8 @@ export function HomePage() {
           key={editing.id}
           receipt={editing}
           categories={allCategories}
-          onSave={(r, newCategory) => {
-            const ok = saveReceipt(r, newCategory);
+          onSave={async (r, newCategory) => {
+            const ok = await saveReceipt(r, newCategory);
             if (ok) setEditing(null);
             return ok;
           }}

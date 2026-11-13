@@ -1,31 +1,35 @@
-import { useCallback, useMemo, useState } from 'react';
-import type { Receipt } from './types';
-import { DEFAULT_CATEGORY_COLORS, fallbackColor } from './lib/color';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { Category, Client, Receipt } from './types';
 import { AppDataContext as Ctx, type AppData, type Toast } from './appData';
-import { isQuotaError, useLocalStorage } from './lib/storage';
+import { useAuth } from './authContext';
 import { exportReceipts } from './lib/export';
-import type { QuarterStagger } from './lib/quarters';
+import { fallbackColor } from './lib/color';
+import { dataUrlToBlob } from './lib/image';
+import * as db from './lib/db';
+import { BootScreen } from './components/BootScreen';
 
-const DEFAULT_CATEGORIES = [
-  'Equipment',
-  'Fuel',
-  'Meals & entertainment',
-  'Office supplies',
-  'Software & subscriptions',
-  'Travel',
-  'Utilities',
-  'Other',
-];
-const NO_RECEIPTS: Receipt[] = [];
-const NO_COLORS: Record<string, string> = {};
+type Phase = { kind: 'loading' } | { kind: 'error'; message: string } | { kind: 'no-client' } | { kind: 'ready' };
 
-/** Owns all persisted data (receipts, categories, settings) and app-wide toasts. */
+const RESIGN_EVERY_MS = 6 * 60 * 60 * 1000; // well inside the 12h signed-URL lifetime
+const IMAGE_DELETE_DELAY_MS = 8000; // keep the image until the Undo toast is gone
+
+const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
+/** Owns all data for the signed-in user (loaded from Supabase) and app-wide toasts. */
 export function AppDataProvider({ children }: { children: React.ReactNode }) {
-  const [receipts, setReceipts] = useLocalStorage<Receipt[]>('ftinvoices.receipts', NO_RECEIPTS);
-  const [storedCategories, setCategories] = useLocalStorage<string[]>('ftinvoices.categories', DEFAULT_CATEGORIES);
-  const [storedColors, setColors] = useLocalStorage<Record<string, string>>('ftinvoices.categoryColors', NO_COLORS);
-  const [stagger, setStaggerStored] = useLocalStorage<QuarterStagger>('ftinvoices.vatQuarterStagger', 0);
+  const { session } = useAuth();
+  const userId = session.user.id;
+
+  const [phase, setPhase] = useState<Phase>({ kind: 'loading' });
+  const [client, setClient] = useState<Client | null>(null);
+  const [categoryList, setCategoryList] = useState<Category[]>([]);
+  const [stored, setStored] = useState<db.StoredReceipt[]>([]);
+  const [urls, setUrls] = useState<Map<string, string>>(() => new Map());
   const [toast, setToast] = useState<Toast | null>(null);
+  const storedRef = useRef(stored);
+  useEffect(() => {
+    storedRef.current = stored;
+  }, [stored]);
 
   const notify = useCallback((msg: string, kind: Toast['kind'] = 'info', undo?: () => void) => {
     const id = Date.now();
@@ -33,57 +37,173 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     setTimeout(() => setToast((t) => (t?.id === id ? null : t)), undo ? 6000 : 4000);
   }, []);
 
-  // Include any category used by a receipt even if it's not in the stored list.
-  const categories = useMemo(() => {
-    const all = new Set([...storedCategories, ...receipts.map((r) => r.category)]);
-    return [...all].sort((a, b) => (a === 'Other' ? 1 : b === 'Other' ? -1 : a.localeCompare(b)));
-  }, [storedCategories, receipts]);
+  /** Fetches everything, then applies it in one go (state is only set after the network calls). */
+  const fetchBooks = useCallback(async () => {
+    try {
+      const clients = await db.listClients();
+      if (!clients.length) return setPhase({ kind: 'no-client' });
+      const c = clients[0];
+      const [cats, recs] = await Promise.all([db.listCategories(c.id), db.listReceipts(c.id)]);
+      const signed = await db.signImages(recs.flatMap((r) => (r.imagePath ? [r.imagePath] : [])));
+      setClient(c);
+      setCategoryList(cats);
+      setStored(recs);
+      setUrls(signed);
+      setPhase({ kind: 'ready' });
+    } catch (e) {
+      setPhase({ kind: 'error', message: errMsg(e) });
+    }
+  }, []);
 
-  const categoryColor = useCallback(
-    (name: string) => storedColors[name] ?? DEFAULT_CATEGORY_COLORS[name] ?? fallbackColor(name),
-    [storedColors],
+  const reload = useCallback(() => {
+    setPhase({ kind: 'loading' });
+    return fetchBooks();
+  }, [fetchBooks]);
+
+  useEffect(() => {
+    // Initial load from Supabase; state is only set after the awaited network calls.
+    // oxlint-disable-next-line react/set-state-in-effect
+    void fetchBooks();
+  }, [fetchBooks]);
+
+  // Signed URLs expire; refresh them periodically while the app stays open.
+  useEffect(() => {
+    if (phase.kind !== 'ready') return;
+    const t = setInterval(() => {
+      const paths = storedRef.current.flatMap((r) => (r.imagePath ? [r.imagePath] : []));
+      db.signImages(paths).then((m) => setUrls((prev) => new Map([...prev, ...m])), console.error);
+    }, RESIGN_EVERY_MS);
+    return () => clearInterval(t);
+  }, [phase.kind]);
+
+  const categoryNames = useMemo(() => new Map(categoryList.map((c) => [c.id, c.name])), [categoryList]);
+
+  const receipts = useMemo<Receipt[]>(
+    () =>
+      stored.map((r) => ({
+        ...r,
+        category: categoryNames.get(r.categoryId) ?? 'Uncategorised',
+        image: r.imagePath ? urls.get(r.imagePath) : undefined,
+      })),
+    [stored, categoryNames, urls],
   );
 
-  const value = useMemo<AppData>(() => {
-    const saveFailed = (error: unknown) =>
-      notify(
-        isQuotaError(error)
-          ? 'Storage is full — couldn’t save. Try removing the image or export and delete old receipts.'
-          : 'Couldn’t save to browser storage.',
-        'error',
-      );
+  const categories = useMemo(
+    () =>
+      categoryList
+        .map((c) => c.name)
+        .sort((a, b) => (a === 'Other' ? 1 : b === 'Other' ? -1 : a.localeCompare(b))),
+    [categoryList],
+  );
+
+  const categoryColor = useCallback(
+    (name: string) => categoryList.find((c) => c.name === name)?.color ?? fallbackColor(name),
+    [categoryList],
+  );
+
+  const value = useMemo<AppData | null>(() => {
+    if (!client) return null;
 
     return {
+      client,
       receipts,
       categories,
+      categoryList,
       categoryColor,
-      stagger,
-      setStagger: (s) => setStaggerStored(() => s),
-      saveReceipt: (receipt, newCategory) => {
-        const isEdit = receipts.some((r) => r.id === receipt.id);
-        const res = setReceipts((prev) =>
-          isEdit ? prev.map((r) => (r.id === receipt.id ? receipt : r)) : [...prev, receipt],
-        );
-        if (!res.ok) {
-          saveFailed(res.error);
-          return false;
-        }
-        if (newCategory) {
-          setCategories((prev) => [...prev, newCategory.name]);
-          setColors((prev) => ({ ...prev, [newCategory.name]: newCategory.color }));
-        }
-        notify(isEdit ? 'Receipt updated' : `Added “${receipt.name}”`);
-        return true;
-      },
-      deleteReceipt: (receipt) => {
-        const res = setReceipts((prev) => prev.filter((r) => r.id !== receipt.id));
-        if (!res.ok) return saveFailed(res.error);
-        notify(`Deleted “${receipt.name}”`, 'info', () => {
-          const r = setReceipts((prev) => (prev.some((x) => x.id === receipt.id) ? prev : [...prev, receipt]));
-          if (!r.ok) saveFailed(r.error);
-          setToast(null);
+      stagger: client.stagger,
+      setStagger: (s) => {
+        const prev = client.stagger;
+        setClient({ ...client, stagger: s });
+        db.updateClient(client.id, { stagger: s }).catch((e) => {
+          setClient((c) => (c ? { ...c, stagger: prev } : c));
+          notify(`Couldn’t save setting: ${errMsg(e)}`, 'error');
         });
       },
+
+      saveReceipt: async (draft, newCategory) => {
+        const existing = stored.find((r) => r.id === draft.id);
+        let uploadedPath: string | undefined;
+        try {
+          // 1. Category (create it first if new)
+          let category = categoryList.find((c) => c.name === draft.category);
+          if (newCategory) {
+            category = await db.insertCategory(client.id, newCategory.name, newCategory.color);
+            const created = category;
+            setCategoryList((prev) => [...prev, created]);
+          }
+          if (!category) throw new Error(`Unknown category “${draft.category}”`);
+
+          // 2. Image: upload a new one, keep the old one, or drop it
+          let imagePath = existing?.imagePath;
+          const isNewImage = draft.image?.startsWith('data:');
+          if (isNewImage) {
+            uploadedPath = db.imagePathFor(userId, client.id, draft.id);
+            await db.uploadImage(uploadedPath, await dataUrlToBlob(draft.image!));
+            imagePath = uploadedPath;
+          } else if (!draft.image) {
+            imagePath = undefined;
+          }
+
+          // 3. Row
+          const saved = await db.upsertReceipt({
+            id: draft.id,
+            clientId: client.id,
+            categoryId: category.id,
+            name: draft.name,
+            total: draft.total,
+            vat: draft.vat,
+            date: draft.date,
+            imagePath,
+            createdAt: existing?.createdAt ?? Date.now(),
+          });
+
+          // Show the freshly uploaded image straight from memory; no need to sign it yet.
+          if (isNewImage && imagePath) {
+            const path = imagePath;
+            setUrls((prev) => new Map(prev).set(path, draft.image!));
+          }
+          setStored((prev) => (existing ? prev.map((r) => (r.id === saved.id ? saved : r)) : [...prev, saved]));
+
+          // Old image replaced or removed → delete it from storage.
+          if (existing?.imagePath && existing.imagePath !== imagePath) {
+            db.removeImages([existing.imagePath]).catch(console.error);
+          }
+          notify(existing ? 'Receipt updated' : `Added “${draft.name}”`);
+          return true;
+        } catch (e) {
+          if (uploadedPath) db.removeImages([uploadedPath]).catch(console.error);
+          notify(`Couldn’t save: ${errMsg(e)}`, 'error');
+          return false;
+        }
+      },
+
+      deleteReceipt: (receipt) => {
+        const row = stored.find((r) => r.id === receipt.id);
+        if (!row) return;
+        setStored((prev) => prev.filter((r) => r.id !== row.id));
+        db.deleteReceipt(row.id).then(
+          () => {
+            const timer = row.imagePath
+              ? setTimeout(() => db.removeImages([row.imagePath!]).catch(console.error), IMAGE_DELETE_DELAY_MS)
+              : undefined;
+            notify(`Deleted “${row.name}”`, 'info', async () => {
+              clearTimeout(timer);
+              setToast(null);
+              try {
+                const restored = await db.upsertReceipt(row);
+                setStored((prev) => (prev.some((r) => r.id === restored.id) ? prev : [...prev, restored]));
+              } catch (e) {
+                notify(`Couldn’t restore: ${errMsg(e)}`, 'error');
+              }
+            });
+          },
+          (e) => {
+            setStored((prev) => (prev.some((r) => r.id === row.id) ? prev : [...prev, row]));
+            notify(`Couldn’t delete: ${errMsg(e)}`, 'error');
+          },
+        );
+      },
+
       exportList: async (list, format, label) => {
         try {
           await exportReceipts(list, format, label);
@@ -94,7 +214,20 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       },
       notify,
     };
-  }, [receipts, categories, categoryColor, stagger, setReceipts, setCategories, setColors, setStaggerStored, notify]);
+  }, [client, stored, receipts, categories, categoryList, categoryColor, userId, notify]);
+
+  if (phase.kind !== 'ready' || !value) {
+    return (
+      <BootScreen
+        phase={phase.kind === 'ready' ? { kind: 'loading' } : phase}
+        onRetry={reload}
+        onCreateClient={async (name) => {
+          await db.createClient(name);
+          await reload();
+        }}
+      />
+    );
+  }
 
   return (
     <Ctx.Provider value={value}>

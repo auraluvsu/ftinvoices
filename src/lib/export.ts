@@ -1,4 +1,5 @@
 import type { Receipt } from '../types';
+import { urlToDataUrl } from './image';
 import { formatMonthKey, round2, todayIso } from './format';
 import { groupByMonth, groupByYear, sumTotals } from './receipts';
 
@@ -40,11 +41,23 @@ function exportCsv(receipts: Receipt[], base: string) {
   download(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }), `${base}.csv`);
 }
 
-function exportJson(receipts: Receipt[], base: string) {
+async function exportJson(receipts: Receipt[], base: string) {
   const data = {
     exportedAt: new Date().toISOString(),
     count: receipts.length,
-    receipts,
+    receipts: await Promise.all(
+      receipts.map(async (r) => ({
+        id: r.id,
+        date: r.date,
+        name: r.name,
+        category: r.category,
+        total: r.total,
+        vat: r.vat,
+        createdAt: new Date(r.createdAt).toISOString(),
+        // Embed images so the export is self-contained (signed URLs expire).
+        image: r.image ? await urlToDataUrl(r.image) : undefined,
+      })),
+    ),
   };
   download(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }), `${base}.json`);
 }
@@ -103,6 +116,6 @@ export async function exportReceipts(receipts: Receipt[], format: ExportFormat, 
   const sorted = [...receipts].sort((a, b) => a.date.localeCompare(b.date));
   const base = `${label}-${todayIso()}`;
   if (format === 'csv') exportCsv(sorted, base);
-  else if (format === 'json') exportJson(sorted, base);
+  else if (format === 'json') await exportJson(sorted, base);
   else await exportXlsx(sorted, base);
 }

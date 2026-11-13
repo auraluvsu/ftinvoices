@@ -1,11 +1,11 @@
-import type { NewCategory, Receipt } from '../types';
+import type { NewCategory, Receipt, ReceiptDraft } from '../types';
 import { Modal } from './Modal';
 import { ReceiptForm } from './ReceiptForm';
 
 interface Props {
   receipt: Receipt;
   categories: string[];
-  onSave: (receipt: Receipt, newCategory?: NewCategory) => boolean;
+  onSave: (draft: ReceiptDraft, newCategory?: NewCategory) => Promise<boolean>;
   onClose: () => void;
   onError: (msg: string) => void;
 }
