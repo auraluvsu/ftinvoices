@@ -23,7 +23,7 @@ function readView(): View {
 }
 
 export function ReceiptsPage() {
-  const { receipts, categories, stagger, openClientSettings, saveReceipt, deleteReceipt, exportList, notify } = useAppData();
+  const { receipts, categories, stagger, openClientSettings, openCategoryManager, saveReceipt, deleteReceipt, exportList, notify } = useAppData();
   const [view, setViewState] = useState<View>(readView);
   const [editing, setEditing] = useState<Receipt | null>(null);
   const [viewing, setViewing] = useState<Receipt | null>(null);
@@ -61,6 +61,9 @@ export function ReceiptsPage() {
     <main className="layout">
       <aside className="sidebar">
         <ReceiptForm categories={categories} editing={null} onSave={handleSave} onError={(m) => notify(m, 'error')} />
+        <button type="button" className="link-btn sidebar-link" onClick={openCategoryManager}>
+          Manage categories
+        </button>
       </aside>
 
       <div className="content">

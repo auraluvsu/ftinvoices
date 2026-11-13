@@ -666,3 +666,28 @@ input[type='number']::-webkit-inner-spin-button { opacity: .4; }
 .first-client h1 { font-size: 1.3rem; margin: 0; text-align: center; }
 .first-client p { text-align: center; }
 .signin-foot { font-size: .8rem; margin: 12px 0 0 !important; }
+
+/* ---------- Manage categories ---------- */
+.modal-wide { width: min(640px, calc(100vw - 32px)); }
+.sidebar-link { align-self: flex-start; padding: 2px 4px; font-size: .88rem; }
+.cat-manage { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.cat-row { border-bottom: 1px solid var(--border); padding: 8px 0; }
+.cat-row-main { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto auto; align-items: center; gap: 10px; }
+.cat-row-name input { width: 100%; height: 36px; background: transparent; border-color: transparent; font-weight: 600; }
+.cat-row-name input:hover { border-color: var(--border); }
+.cat-row-name input:focus { background: var(--surface); }
+.cat-row-name.has-error input { border-color: var(--danger); }
+.cat-row-count { font-size: .82rem; white-space: nowrap; }
+.cat-row-actions { display: flex; align-items: center; gap: 2px; }
+.cat-row-actions .btn:disabled { opacity: .35; cursor: not-allowed; }
+.cat-row-panel { margin: 8px 0 4px 38px; animation: fade-down .2s var(--ease-out) backwards; }
+.cat-merge { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.cat-merge select { width: auto; height: 34px; }
+.cat-add { display: flex; flex-direction: column; gap: 12px; padding-top: 6px; }
+.cat-add h3 { margin: 0; font-size: 1rem; }
+.cat-add .btn { align-self: flex-start; }
+@media (max-width: 600px) {
+  .cat-row-main { grid-template-columns: 28px minmax(0, 1fr) auto; }
+  .cat-row-count { display: none; }
+  .cat-row-panel { margin-left: 0; }
+}

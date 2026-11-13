@@ -23,6 +23,13 @@ export interface AppData {
   categoryList: Category[];
   /** Display colour for a category (hex). */
   categoryColor: (name: string) => string;
+  addCategory: (name: string, color: string) => Promise<boolean>;
+  updateCategory: (id: string, patch: { name?: string; color?: string }) => Promise<boolean>;
+  /** Moves all receipts from one category into another, then deletes the first. */
+  mergeCategory: (fromId: string, toId: string) => Promise<boolean>;
+  /** Deletes an unused category. */
+  deleteCategory: (id: string) => Promise<boolean>;
+  openCategoryManager: () => void;
   stagger: QuarterStagger;
   /** Adds or updates a receipt (uploading any new image). Resolves false if it couldn't be saved. */
   saveReceipt: (draft: ReceiptDraft, newCategory?: NewCategory) => Promise<boolean>;

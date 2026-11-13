@@ -8,6 +8,7 @@ import { dataUrlToBlob } from './lib/image';
 import * as db from './lib/db';
 import { BootScreen } from './components/BootScreen';
 import { ClientSettingsModal } from './components/ClientSettingsModal';
+import { ManageCategoriesModal } from './components/ManageCategoriesModal';
 
 type Phase = { kind: 'loading' } | { kind: 'error'; message: string } | { kind: 'no-client' } | { kind: 'ready' };
 
@@ -42,6 +43,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const [clients, setClients] = useState<Client[]>([]);
   const [clientId, setClientId] = useState<string | null>(null);
   const [settings, setSettings] = useState<'edit' | 'new' | null>(null);
+  const [managingCategories, setManagingCategories] = useState(false);
   const client = clients.find((c) => c.id === clientId) ?? null;
   const [categoryList, setCategoryList] = useState<Category[]>([]);
   const [stored, setStored] = useState<db.StoredReceipt[]>([]);
@@ -158,6 +160,51 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       categories,
       categoryList,
       categoryColor,
+      openCategoryManager: () => setManagingCategories(true),
+      addCategory: async (name, color) => {
+        try {
+          const created = await db.insertCategory(client.id, name, color);
+          setCategoryList((prev) => [...prev, created]);
+          return true;
+        } catch (e) {
+          notify(`Couldn’t add category: ${errMsg(e)}`, 'error');
+          return false;
+        }
+      },
+      updateCategory: async (id, patch) => {
+        const before = categoryList;
+        setCategoryList((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+        try {
+          await db.updateCategory(id, patch);
+          return true;
+        } catch (e) {
+          setCategoryList(before);
+          notify(`Couldn’t update category: ${errMsg(e)}`, 'error');
+          return false;
+        }
+      },
+      mergeCategory: async (fromId, toId) => {
+        try {
+          await db.reassignReceipts(client.id, fromId, toId);
+          setStored((prev) => prev.map((r) => (r.categoryId === fromId ? { ...r, categoryId: toId } : r)));
+          await db.deleteCategory(fromId);
+          setCategoryList((prev) => prev.filter((c) => c.id !== fromId));
+          return true;
+        } catch (e) {
+          notify(`Couldn’t merge: ${errMsg(e)}`, 'error');
+          return false;
+        }
+      },
+      deleteCategory: async (id) => {
+        try {
+          await db.deleteCategory(id);
+          setCategoryList((prev) => prev.filter((c) => c.id !== id));
+          return true;
+        } catch (e) {
+          notify(`Couldn’t delete category: ${errMsg(e)}`, 'error');
+          return false;
+        }
+      },
       stagger: client.stagger,
 
       saveReceipt: async (draft, newCategory) => {
@@ -270,6 +317,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     <Ctx.Provider value={value}>
       {/* Remount pages on client switch so per-page state (open months, filters, edits) resets. */}
       <Fragment key={value.client.id}>{children}</Fragment>
+      {managingCategories && <ManageCategoriesModal onClose={() => setManagingCategories(false)} />}
       {settings && (
         <ClientSettingsModal
           client={settings === 'edit' ? value.client : null}

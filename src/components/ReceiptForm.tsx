@@ -81,7 +81,10 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
   // Default a new category to the first suggested colour not already in use.
   const usedColors = new Set(categories.map(categoryColor));
   const newColor = draft.newColor || (SUGGESTED_COLORS.find((c) => !usedColors.has(c)) ?? SUGGESTED_COLORS[0]);
-  const selectedColor = draft.category === NEW_CATEGORY ? newColor : categoryColor(draft.category);
+  // If the chosen category was renamed, merged or deleted meanwhile, fall back to one that exists.
+  const currentCategory =
+    draft.category === NEW_CATEGORY || categories.includes(draft.category) ? draft.category : (categories[0] ?? '');
+  const selectedColor = currentCategory === NEW_CATEGORY ? newColor : categoryColor(currentCategory);
 
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => {
     setDraft((d) => ({ ...d, [k]: v }));
@@ -104,8 +107,8 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
     const errs: typeof errors = {};
     const total = Number(draft.total);
     const vat = draft.vat.trim() === '' ? 0 : Number(draft.vat);
-    const isNew = draft.category === NEW_CATEGORY;
-    const category = (isNew ? draft.newCategory : draft.category).trim();
+    const isNew = currentCategory === NEW_CATEGORY;
+    const category = (isNew ? draft.newCategory : currentCategory).trim();
 
     if (!draft.name.trim()) errs.name = 'Required';
     if (draft.total.trim() === '' || isNaN(total) || total < 0) errs.total = 'Enter a valid amount';
@@ -219,7 +222,7 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
           <div className="select-swatch">
             <span className="dot" style={catVar(selectedColor)} aria-hidden />
             <select
-              value={draft.category}
+              value={currentCategory}
               onChange={(e) => {
                 set('category', e.target.value);
                 setCategoryTouched(true);

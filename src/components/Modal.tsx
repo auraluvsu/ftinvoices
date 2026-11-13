@@ -20,7 +20,8 @@ export function Modal({ label, onClose, closeOnBackdrop = true, className = '', 
   useEffect(() => {
     const previouslyFocused = document.activeElement as HTMLElement | null;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCloseRef.current();
+      // A field that handles Escape itself (e.g. to undo an edit) calls preventDefault.
+      if (e.key === 'Escape' && !e.defaultPrevented) onCloseRef.current();
       else if (e.key === 'Tab') trapFocus(e, dialogRef.current);
     };
     document.addEventListener('keydown', onKey);

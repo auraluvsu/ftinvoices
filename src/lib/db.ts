@@ -109,6 +109,21 @@ export async function insertCategory(clientId: string, name: string, color: stri
   return toCategory(row as CategoryRow);
 }
 
+export async function updateCategory(id: string, patch: { name?: string; color?: string }): Promise<void> {
+  check(await supabase.from('categories').update(patch).eq('id', id));
+}
+
+export async function deleteCategory(id: string): Promise<void> {
+  check(await supabase.from('categories').delete().eq('id', id));
+}
+
+/** Moves every receipt in one category to another (same client). */
+export async function reassignReceipts(clientId: string, fromId: string, toId: string): Promise<void> {
+  check(
+    await supabase.from('receipts').update({ category_id: toId }).eq('client_id', clientId).eq('category_id', fromId),
+  );
+}
+
 // ---------- Receipts ----------
 export async function listReceipts(clientId: string): Promise<StoredReceipt[]> {
   const rows = check(

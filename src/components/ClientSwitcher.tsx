@@ -3,7 +3,7 @@ import { useAppData } from '../appData';
 
 /** Top-bar dropdown: which client's books are open, plus new client / settings. */
 export function ClientSwitcher() {
-  const { client, clients, switchClient, openClientSettings } = useAppData();
+  const { client, clients, switchClient, openClientSettings, openCategoryManager } = useAppData();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -55,6 +55,9 @@ export function ClientSwitcher() {
           </button>
           <button type="button" role="menuitem" onClick={pick(() => openClientSettings('edit'))}>
             <span>Client settings</span>
+          </button>
+          <button type="button" role="menuitem" onClick={pick(openCategoryManager)}>
+            <span>Manage categories</span>
           </button>
         </div>
       )}
