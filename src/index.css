@@ -211,6 +211,56 @@ input[type='number']::-webkit-inner-spin-button { opacity: .4; }
   .summary .stat:last-child { grid-column: span 2; }
 }
 
+/* ---------- Tabs ---------- */
+.tabs {
+  display: inline-flex; align-self: flex-start; gap: 4px; padding: 4px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px;
+}
+.tab {
+  height: 34px; padding: 0 16px; border: none; border-radius: 9px; background: none;
+  cursor: pointer; font-weight: 600; color: var(--muted);
+}
+.tab:hover { color: var(--text); }
+.tab.active { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+
+/* ---------- Quarterly review ---------- */
+.quarters { display: flex; flex-direction: column; gap: 14px; }
+.quarter-settings { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.quarter-settings select { width: auto; height: 36px; }
+.quarter { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.quarter-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.quarter-head h3 { font-size: 1.2rem; }
+.quarter-head .muted { font-size: .85rem; }
+.quarter-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.qstat {
+  display: flex; flex-direction: column; gap: 2px; padding: 12px 14px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm);
+}
+.qstat > span { font-size: .78rem; color: var(--muted); }
+.qstat strong { font-size: 1.25rem; font-weight: 650; }
+.qstat small { font-size: .75rem; color: var(--muted); }
+.qstat small.up { color: var(--danger); }
+.qstat small.down { color: var(--accent-text); }
+.qstat-accent { background: var(--accent-soft); border-color: var(--accent); }
+.quarter-body { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.quarter-body h4 { margin: 0 0 8px; font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.qtable { width: 100%; border-collapse: collapse; font-size: .88rem; }
+.qtable th { text-align: right; font-weight: 600; font-size: .75rem; color: var(--muted); padding: 0 0 6px; }
+.qtable td { text-align: right; padding: 7px 0; border-top: 1px solid var(--border); }
+.qtable th:first-child, .qtable td:first-child { text-align: left; }
+.qtable tr.muted td { color: var(--muted); }
+.cat-bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.cat-bar-label { display: flex; justify-content: space-between; gap: 8px; font-size: .85rem; margin-bottom: 4px; }
+.cat-bar-label > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cat-bar-label > span:last-child { white-space: nowrap; }
+.cat-bar { height: 6px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
+.cat-bar span { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+@media (max-width: 700px) {
+  .quarter-body { grid-template-columns: 1fr; }
+  .quarter-stats { grid-template-columns: 1fr 1fr; }
+  .quarter-stats .qstat:first-child { grid-column: span 2; }
+}
+
 /* ---------- Year group ---------- */
 .year-group { display: flex; flex-direction: column; gap: 10px; }
 .year-group + .year-group { margin-top: 14px; }

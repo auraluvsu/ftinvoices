@@ -7,6 +7,8 @@ import { formatMoney } from './lib/format';
 import { ReceiptForm } from './components/ReceiptForm';
 import { MonthSection } from './components/MonthSection';
 import { YearHeader } from './components/YearHeader';
+import { QuarterlyReview } from './components/QuarterlyReview';
+import type { QuarterStagger } from './lib/quarters';
 import { ExportMenu } from './components/ExportMenu';
 import { ImageModal } from './components/ImageModal';
 import { EditReceiptModal } from './components/EditReceiptModal';
@@ -23,6 +25,16 @@ const DEFAULT_CATEGORIES = [
   'Other',
 ];
 const NO_RECEIPTS: Receipt[] = [];
+const VIEW_KEY = 'ftinvoices.view';
+type View = 'monthly' | 'quarterly';
+
+function readView(): View {
+  try {
+    return localStorage.getItem(VIEW_KEY) === 'quarterly' ? 'quarterly' : 'monthly';
+  } catch {
+    return 'monthly';
+  }
+}
 const STORAGE_LIMIT = 5 * 1024 * 1024; // typical browser localStorage quota
 
 interface Toast {
@@ -35,6 +47,8 @@ interface Toast {
 export default function App() {
   const [receipts, setReceipts] = useLocalStorage<Receipt[]>('ftinvoices.receipts', NO_RECEIPTS);
   const [storedCategories, setCategories] = useLocalStorage<string[]>('ftinvoices.categories', DEFAULT_CATEGORIES);
+  const [stagger, setStagger] = useLocalStorage<QuarterStagger>('ftinvoices.vatQuarterStagger', 0);
+  const [view, setViewState] = useState<View>(readView);
   const [editing, setEditing] = useState<Receipt | null>(null);
   const [viewing, setViewing] = useState<Receipt | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
@@ -89,6 +103,15 @@ export default function App() {
       if (!r.ok) saveFailed(r.error);
       setToast(null);
     });
+  };
+
+  const setView = (v: View) => {
+    setViewState(v);
+    try {
+      localStorage.setItem(VIEW_KEY, v);
+    } catch {
+      /* non-essential */
+    }
   };
 
   const handleExport = async (list: Receipt[], format: ExportFormat, label?: string) => {
@@ -154,24 +177,49 @@ export default function App() {
               <p className="muted">Add your first receipt using the form. It’ll appear here grouped by month.</p>
             </div>
           ) : (
-            years.map((y) => (
-              <section key={y.year} className="year-group" aria-label={`${y.year}`}>
-                <YearHeader year={y.year} receipts={y.receipts} />
-                {y.months.map((m) => (
-                  <MonthSection
-                    key={m.key}
-                    monthKey={m.key}
-                    receipts={m.receipts}
-                    defaultOpen={m.key === newestMonth}
-                    editingId={editing?.id}
-                    onEdit={setEditing}
-                    onDelete={handleDelete}
-                    onViewImage={setViewing}
-                    onExport={handleExport}
-                  />
+            <>
+              <div className="tabs" role="tablist" aria-label="View">
+                {(['monthly', 'quarterly'] as const).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    role="tab"
+                    aria-selected={view === v}
+                    className={`tab${view === v ? ' active' : ''}`}
+                    onClick={() => setView(v)}
+                  >
+                    {v === 'monthly' ? 'Monthly' : 'Quarterly review'}
+                  </button>
                 ))}
-              </section>
-            ))
+              </div>
+              {view === 'quarterly' ? (
+                <QuarterlyReview
+                  receipts={receipts}
+                  stagger={stagger}
+                  onStaggerChange={(s) => setStagger(() => s)}
+                  onExport={handleExport}
+                />
+              ) : (
+              years.map((y) => (
+                <section key={y.year} className="year-group" aria-label={`${y.year}`}>
+                  <YearHeader year={y.year} receipts={y.receipts} />
+                  {y.months.map((m) => (
+                    <MonthSection
+                      key={m.key}
+                      monthKey={m.key}
+                      receipts={m.receipts}
+                      defaultOpen={m.key === newestMonth}
+                      editingId={editing?.id}
+                      onEdit={setEditing}
+                      onDelete={handleDelete}
+                      onViewImage={setViewing}
+                      onExport={handleExport}
+                    />
+                  ))}
+                </section>
+              ))
+              )}
+            </>
           )}
         </div>
       </main>
