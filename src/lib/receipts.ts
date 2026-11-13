@@ -77,3 +77,25 @@ export function activeFilterCount(f: MonthFilters): number {
       .length + (f.categories.length ? 1 : 0)
   );
 }
+
+export interface YearGroup {
+  year: string; // YYYY
+  months: MonthGroup[];
+  receipts: Receipt[];
+}
+
+/** Group month groups (already newest first) by calendar year, newest first. */
+export function groupByYear(months: MonthGroup[]): YearGroup[] {
+  const years: YearGroup[] = [];
+  for (const m of months) {
+    const year = m.key.slice(0, 4);
+    let g = years[years.length - 1];
+    if (!g || g.year !== year) {
+      g = { year, months: [], receipts: [] };
+      years.push(g);
+    }
+    g.months.push(m);
+    g.receipts.push(...m.receipts);
+  }
+  return years;
+}

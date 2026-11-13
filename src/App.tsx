@@ -1,11 +1,12 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { Receipt } from './types';
 import { isQuotaError, useLocalStorage } from './lib/storage';
-import { groupByMonth, sumTotals } from './lib/receipts';
+import { groupByMonth, groupByYear, sumTotals } from './lib/receipts';
 import { exportReceipts, type ExportFormat } from './lib/export';
 import { formatMoney } from './lib/format';
 import { ReceiptForm } from './components/ReceiptForm';
 import { MonthSection } from './components/MonthSection';
+import { YearHeader } from './components/YearHeader';
 import { ExportMenu } from './components/ExportMenu';
 import { ImageModal } from './components/ImageModal';
 import { EditReceiptModal } from './components/EditReceiptModal';
@@ -50,7 +51,8 @@ export default function App() {
     return [...all].sort((a, b) => (a === 'Other' ? 1 : b === 'Other' ? -1 : a.localeCompare(b)));
   }, [storedCategories, receipts]);
 
-  const months = useMemo(() => groupByMonth(receipts), [receipts]);
+  const years = useMemo(() => groupByYear(groupByMonth(receipts)), [receipts]);
+  const newestMonth = years[0]?.months[0]?.key;
   const grand = useMemo(() => sumTotals(receipts), [receipts]);
   // Rough size of what we store (UTF-16 → 2 bytes per char).
   const usage = useMemo(() => JSON.stringify(receipts).length * 2, [receipts]);
@@ -146,24 +148,29 @@ export default function App() {
             <Stat label="Receipts" value={String(grand.count)} />
           </div>
 
-          {months.length === 0 ? (
+          {years.length === 0 ? (
             <div className="card empty">
               <h3>No receipts yet</h3>
               <p className="muted">Add your first receipt using the form. It’ll appear here grouped by month.</p>
             </div>
           ) : (
-            months.map((m, i) => (
-              <MonthSection
-                key={m.key}
-                monthKey={m.key}
-                receipts={m.receipts}
-                defaultOpen={i === 0}
-                editingId={editing?.id}
-                onEdit={setEditing}
-                onDelete={handleDelete}
-                onViewImage={setViewing}
-                onExport={handleExport}
-              />
+            years.map((y) => (
+              <section key={y.year} className="year-group" aria-label={`${y.year}`}>
+                <YearHeader year={y.year} receipts={y.receipts} />
+                {y.months.map((m) => (
+                  <MonthSection
+                    key={m.key}
+                    monthKey={m.key}
+                    receipts={m.receipts}
+                    defaultOpen={m.key === newestMonth}
+                    editingId={editing?.id}
+                    onEdit={setEditing}
+                    onDelete={handleDelete}
+                    onViewImage={setViewing}
+                    onExport={handleExport}
+                  />
+                ))}
+              </section>
             ))
           )}
         </div>

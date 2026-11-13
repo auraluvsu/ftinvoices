@@ -1,6 +1,6 @@
 import type { Receipt } from '../types';
 import { formatMonthKey, round2, todayIso } from './format';
-import { groupByMonth, sumTotals } from './receipts';
+import { groupByMonth, groupByYear, sumTotals } from './receipts';
 
 export type ExportFormat = 'xlsx' | 'csv' | 'json';
 
@@ -72,14 +72,18 @@ async function exportXlsx(receipts: Receipt[], base: string) {
     return ws;
   };
 
-  // Summary sheet: one row per month.
+  // Summary sheet: one row per year, then one row per month.
   const groups = groupByMonth(receipts);
+  const totalsRow = (label: string, rows: Receipt[]) => {
+    const t = sumTotals(rows);
+    return [label, t.count, round2(t.total), round2(t.vat), round2(t.net)];
+  };
   const summary = XLSX.utils.aoa_to_sheet([
+    ['Year', 'Receipts', 'Total', 'VAT', 'Net'],
+    ...groupByYear(groups).map((y) => totalsRow(y.year, y.receipts)),
+    [],
     ['Month', 'Receipts', 'Total', 'VAT', 'Net'],
-    ...groups.map((g) => {
-      const t = sumTotals(g.receipts);
-      return [formatMonthKey(g.key), t.count, round2(t.total), round2(t.vat), round2(t.net)];
-    }),
+    ...groups.map((g) => totalsRow(formatMonthKey(g.key), g.receipts)),
   ]);
   summary['!cols'] = [{ wch: 18 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
   XLSX.utils.book_append_sheet(wb, summary, 'Summary');
