@@ -11,30 +11,22 @@ import { catVar } from '../lib/color';
 interface Props {
   receipts: Receipt[];
   stagger: QuarterStagger;
-  onStaggerChange: (s: QuarterStagger) => void;
+  onEditSettings: () => void;
   onExport: (receipts: Receipt[], format: ExportFormat, label: string) => void;
 }
 
-export function QuarterlyReview({ receipts, stagger, onStaggerChange, onExport }: Props) {
+export function QuarterlyReview({ receipts, stagger, onEditSettings, onExport }: Props) {
   const quarters = useMemo(() => groupByQuarter(receipts, stagger), [receipts, stagger]);
 
   return (
     <div className="quarters">
       <div className="quarter-settings">
-        <label htmlFor="vat-stagger" className="inline-label">
-          VAT quarters end in
-        </label>
-        <select
-          id="vat-stagger"
-          value={stagger}
-          onChange={(e) => onStaggerChange(Number(e.target.value) as QuarterStagger)}
-        >
-          {STAGGER_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+        <span className="muted">
+          VAT quarters end in <strong>{STAGGER_OPTIONS.find((o) => o.value === stagger)?.label}</strong>
+        </span>
+        <button type="button" className="link-btn" onClick={onEditSettings}>
+          Change
+        </button>
       </div>
 
       {quarters.map((q) => {

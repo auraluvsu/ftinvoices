@@ -13,6 +13,10 @@ export interface Toast {
 export interface AppData {
   /** The client whose books are open. */
   client: Client;
+  clients: Client[];
+  switchClient: (id: string) => void;
+  /** Opens the client settings popup (for the open client, or a new one). */
+  openClientSettings: (mode?: 'edit' | 'new') => void;
   receipts: Receipt[];
   /** Category names for the open client, sorted with "Other" last. */
   categories: string[];
@@ -20,7 +24,6 @@ export interface AppData {
   /** Display colour for a category (hex). */
   categoryColor: (name: string) => string;
   stagger: QuarterStagger;
-  setStagger: (s: QuarterStagger) => void;
   /** Adds or updates a receipt (uploading any new image). Resolves false if it couldn't be saved. */
   saveReceipt: (draft: ReceiptDraft, newCategory?: NewCategory) => Promise<boolean>;
   deleteReceipt: (receipt: Receipt) => void;

@@ -41,9 +41,10 @@ function exportCsv(receipts: Receipt[], base: string) {
   download(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }), `${base}.csv`);
 }
 
-async function exportJson(receipts: Receipt[], base: string) {
+async function exportJson(receipts: Receipt[], base: string, meta?: ExportMeta) {
   const data = {
     exportedAt: new Date().toISOString(),
+    client: meta ? { name: meta.client, vatNumber: meta.vatNumber ?? null } : undefined,
     count: receipts.length,
     receipts: await Promise.all(
       receipts.map(async (r) => ({
@@ -62,7 +63,7 @@ async function exportJson(receipts: Receipt[], base: string) {
   download(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }), `${base}.json`);
 }
 
-async function exportXlsx(receipts: Receipt[], base: string) {
+async function exportXlsx(receipts: Receipt[], base: string, meta?: ExportMeta) {
   const XLSX = await import('xlsx'); // lazy-load: only needed when exporting
   const wb = XLSX.utils.book_new();
 
@@ -92,6 +93,7 @@ async function exportXlsx(receipts: Receipt[], base: string) {
     return [label, t.count, round2(t.total), round2(t.vat), round2(t.net)];
   };
   const summary = XLSX.utils.aoa_to_sheet([
+    ...(meta ? [['Client', meta.client], ...(meta.vatNumber ? [['VAT number', meta.vatNumber]] : []), []] : []),
     ['Year', 'Receipts', 'Total', 'VAT', 'Net'],
     ...groupByYear(groups).map((y) => totalsRow(y.year, y.receipts)),
     [],
@@ -112,10 +114,18 @@ async function exportXlsx(receipts: Receipt[], base: string) {
   XLSX.writeFile(wb, `${base}.xlsx`);
 }
 
-export async function exportReceipts(receipts: Receipt[], format: ExportFormat, label = 'receipts') {
+export interface ExportMeta {
+  client: string;
+  vatNumber?: string | null;
+}
+
+const slug = (s: string) =>
+  s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+
+export async function exportReceipts(receipts: Receipt[], format: ExportFormat, label = 'receipts', meta?: ExportMeta) {
   const sorted = [...receipts].sort((a, b) => a.date.localeCompare(b.date));
-  const base = `${label}-${todayIso()}`;
+  const base = [meta && slug(meta.client), label, todayIso()].filter(Boolean).join('-');
   if (format === 'csv') exportCsv(sorted, base);
-  else if (format === 'json') await exportJson(sorted, base);
-  else await exportXlsx(sorted, base);
+  else if (format === 'json') await exportJson(sorted, base, meta);
+  else await exportXlsx(sorted, base, meta);
 }

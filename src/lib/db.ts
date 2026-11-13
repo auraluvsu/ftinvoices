@@ -77,9 +77,13 @@ export async function listClients(): Promise<Client[]> {
   return (rows as ClientRow[]).map(toClient);
 }
 
-export async function createClient(name: string): Promise<Client> {
+export async function createClient(c: Omit<Client, 'id'>): Promise<Client> {
   const row = check(
-    await supabase.from('clients').insert({ name }).select('id,name,vat_number,vat_quarter_stagger').single(),
+    await supabase
+      .from('clients')
+      .insert({ name: c.name, vat_number: c.vatNumber, vat_quarter_stagger: c.stagger })
+      .select('id,name,vat_number,vat_quarter_stagger')
+      .single(),
   );
   return toClient(row as ClientRow);
 }

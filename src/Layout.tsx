@@ -3,6 +3,7 @@ import { useAppData } from './appData';
 import { ExportMenu } from './components/ExportMenu';
 import { ThemeToggle } from './components/ThemeToggle';
 import { AccountMenu } from './components/AccountMenu';
+import { ClientSwitcher } from './components/ClientSwitcher';
 
 const NAV = [
   { to: '/', label: 'Overview' },
@@ -24,6 +25,7 @@ export function Layout() {
             </span>
             <h1>Bookkeeping</h1>
           </Link>
+          <ClientSwitcher />
           <nav className="nav" aria-label="Main">
             {NAV.map((n) => (
               <NavLink key={n.to} to={n.to} end className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>

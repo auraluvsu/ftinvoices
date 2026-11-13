@@ -23,7 +23,7 @@ function readView(): View {
 }
 
 export function ReceiptsPage() {
-  const { receipts, categories, stagger, setStagger, saveReceipt, deleteReceipt, exportList, notify } = useAppData();
+  const { receipts, categories, stagger, openClientSettings, saveReceipt, deleteReceipt, exportList, notify } = useAppData();
   const [view, setViewState] = useState<View>(readView);
   const [editing, setEditing] = useState<Receipt | null>(null);
   const [viewing, setViewing] = useState<Receipt | null>(null);
@@ -90,7 +90,7 @@ export function ReceiptsPage() {
               <QuarterlyReview
                 receipts={receipts}
                 stagger={stagger}
-                onStaggerChange={setStagger}
+                onEditSettings={openClientSettings}
                 onExport={exportList}
               />
             ) : (

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Category, Client, Receipt } from './types';
 import { AppDataContext as Ctx, type AppData, type Toast } from './appData';
 import { useAuth } from './authContext';
@@ -7,6 +7,7 @@ import { fallbackColor } from './lib/color';
 import { dataUrlToBlob } from './lib/image';
 import * as db from './lib/db';
 import { BootScreen } from './components/BootScreen';
+import { ClientSettingsModal } from './components/ClientSettingsModal';
 
 type Phase = { kind: 'loading' } | { kind: 'error'; message: string } | { kind: 'no-client' } | { kind: 'ready' };
 
@@ -15,13 +16,33 @@ const IMAGE_DELETE_DELAY_MS = 8000; // keep the image until the Undo toast is go
 
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
+// Which client was last open on this device (a convenience only).
+const CLIENT_KEY = 'ftinvoices.clientId';
+const readClientId = () => {
+  try {
+    return localStorage.getItem(CLIENT_KEY);
+  } catch {
+    return null;
+  }
+};
+const saveClientId = (id: string) => {
+  try {
+    localStorage.setItem(CLIENT_KEY, id);
+  } catch {
+    /* non-essential */
+  }
+};
+
 /** Owns all data for the signed-in user (loaded from Supabase) and app-wide toasts. */
 export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const { session } = useAuth();
   const userId = session.user.id;
 
   const [phase, setPhase] = useState<Phase>({ kind: 'loading' });
-  const [client, setClient] = useState<Client | null>(null);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [clientId, setClientId] = useState<string | null>(null);
+  const [settings, setSettings] = useState<'edit' | 'new' | null>(null);
+  const client = clients.find((c) => c.id === clientId) ?? null;
   const [categoryList, setCategoryList] = useState<Category[]>([]);
   const [stored, setStored] = useState<db.StoredReceipt[]>([]);
   const [urls, setUrls] = useState<Map<string, string>>(() => new Map());
@@ -38,14 +59,17 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   /** Fetches everything, then applies it in one go (state is only set after the network calls). */
-  const fetchBooks = useCallback(async () => {
+  const fetchBooks = useCallback(async (preferredId?: string) => {
     try {
-      const clients = await db.listClients();
-      if (!clients.length) return setPhase({ kind: 'no-client' });
-      const c = clients[0];
+      const all = await db.listClients();
+      if (!all.length) return setPhase({ kind: 'no-client' });
+      const want = preferredId ?? readClientId();
+      const c = all.find((x) => x.id === want) ?? all[0];
       const [cats, recs] = await Promise.all([db.listCategories(c.id), db.listReceipts(c.id)]);
       const signed = await db.signImages(recs.flatMap((r) => (r.imagePath ? [r.imagePath] : [])));
-      setClient(c);
+      saveClientId(c.id);
+      setClients(all);
+      setClientId(c.id);
       setCategoryList(cats);
       setStored(recs);
       setUrls(signed);
@@ -55,10 +79,29 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const reload = useCallback(() => {
-    setPhase({ kind: 'loading' });
-    return fetchBooks();
-  }, [fetchBooks]);
+  const reload = useCallback(
+    (preferredId?: string) => {
+      setPhase({ kind: 'loading' });
+      return fetchBooks(preferredId);
+    },
+    [fetchBooks],
+  );
+
+  const createClient = useCallback(
+    async (c: Omit<Client, 'id'>) => {
+      const created = await db.createClient(c);
+      await reload(created.id);
+    },
+    [reload],
+  );
+
+  const updateClient = useCallback(
+    async (id: string, patch: Omit<Client, 'id'>) => {
+      await db.updateClient(id, patch);
+      setClients((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+    },
+    [],
+  );
 
   useEffect(() => {
     // Initial load from Supabase; state is only set after the awaited network calls.
@@ -106,19 +149,16 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
 
     return {
       client,
+      clients,
+      switchClient: (id) => {
+        if (id !== client.id) void reload(id);
+      },
+      openClientSettings: (mode = 'edit') => setSettings(mode),
       receipts,
       categories,
       categoryList,
       categoryColor,
       stagger: client.stagger,
-      setStagger: (s) => {
-        const prev = client.stagger;
-        setClient({ ...client, stagger: s });
-        db.updateClient(client.id, { stagger: s }).catch((e) => {
-          setClient((c) => (c ? { ...c, stagger: prev } : c));
-          notify(`Couldn’t save setting: ${errMsg(e)}`, 'error');
-        });
-      },
 
       saveReceipt: async (draft, newCategory) => {
         const existing = stored.find((r) => r.id === draft.id);
@@ -206,7 +246,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
 
       exportList: async (list, format, label) => {
         try {
-          await exportReceipts(list, format, label);
+          await exportReceipts(list, format, label, { client: client.name, vatNumber: client.vatNumber });
         } catch (e) {
           console.error(e);
           notify('Export failed', 'error');
@@ -214,24 +254,44 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       },
       notify,
     };
-  }, [client, stored, receipts, categories, categoryList, categoryColor, userId, notify]);
+  }, [client, clients, reload, stored, receipts, categories, categoryList, categoryColor, userId, notify]);
 
   if (phase.kind !== 'ready' || !value) {
     return (
       <BootScreen
         phase={phase.kind === 'ready' ? { kind: 'loading' } : phase}
-        onRetry={reload}
-        onCreateClient={async (name) => {
-          await db.createClient(name);
-          await reload();
-        }}
+        onRetry={() => reload()}
+        onCreateClient={(name) => createClient({ name, vatNumber: null, stagger: 0 })}
       />
     );
   }
 
   return (
     <Ctx.Provider value={value}>
-      {children}
+      {/* Remount pages on client switch so per-page state (open months, filters, edits) resets. */}
+      <Fragment key={value.client.id}>{children}</Fragment>
+      {settings && (
+        <ClientSettingsModal
+          client={settings === 'edit' ? value.client : null}
+          onClose={() => setSettings(null)}
+          onSave={async (c) => {
+            try {
+              if (settings === 'edit') {
+                await updateClient(value.client.id, c);
+                notify('Client updated');
+              } else {
+                await createClient(c);
+                notify(`Created “${c.name}”`);
+              }
+              setSettings(null);
+              return true;
+            } catch (e) {
+              notify(`Couldn’t save client: ${errMsg(e)}`, 'error');
+              return false;
+            }
+          }}
+        />
+      )}
       {toast && (
         <div className={`toast ${toast.kind}`} role={toast.kind === 'error' ? 'alert' : 'status'}>
           <span>{toast.msg}</span>
