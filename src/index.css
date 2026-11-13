@@ -498,6 +498,52 @@ input[type='number']::-webkit-inner-spin-button { opacity: .4; }
 .toast.error .link-btn { color: #fff; }
 
 @keyframes fade { from { opacity: 0; } }
+@keyframes fade-up { from { opacity: 0; transform: translateY(10px); } }
+@keyframes fade-down { from { opacity: 0; transform: translateY(-6px); } }
+@keyframes grow-y { from { transform: scaleY(0); } }
+@keyframes grow-x { from { transform: scaleX(0); } }
+
+/* ---------- Entrance motion ----------
+   'backwards' fill only: once finished, no transform lingers to create
+   stacking contexts that would trap dropdowns and tooltips. */
+:root { --ease-out: cubic-bezier(.22, .8, .24, 1); }
+.sidebar,
+.content > *, .page > *, .year-group > *, .quarters > *,
+.summary > .stat, .tiles > .stat, .quarter-stats > .qstat {
+  animation: fade-up .5s var(--ease-out) backwards;
+}
+.content > :nth-child(2), .page > :nth-child(2), .year-group > :nth-child(2), .quarters > :nth-child(2),
+.summary > :nth-child(2), .tiles > :nth-child(2) { animation-delay: 60ms; }
+.content > :nth-child(3), .page > :nth-child(3), .year-group > :nth-child(3), .quarters > :nth-child(3),
+.summary > :nth-child(3), .tiles > :nth-child(3) { animation-delay: 120ms; }
+.content > :nth-child(4), .page > :nth-child(4), .year-group > :nth-child(4), .quarters > :nth-child(4),
+.tiles > :nth-child(4) { animation-delay: 180ms; }
+.content > :nth-child(5), .page > :nth-child(5), .year-group > :nth-child(5), .quarters > :nth-child(5) { animation-delay: 240ms; }
+.content > :nth-child(n+6), .page > :nth-child(n+6), .year-group > :nth-child(n+6), .quarters > :nth-child(n+6) { animation-delay: 300ms; }
+.sidebar { animation-delay: 0ms; }
+
+.month-body { animation: fade .3s var(--ease-out); }
+.receipt, .bills li { animation: fade-up .35s var(--ease-out) backwards; }
+.filters, .menu-list { animation: fade-down .2s var(--ease-out); }
+.image-preview, .field-error { animation: fade .25s var(--ease-out); }
+.chart-tip { animation: fade .15s ease-out; }
+
+.bar-col .bar {
+  transform-origin: bottom;
+  animation: grow-y .6s var(--ease-out) backwards;
+  animation-delay: calc(200ms + var(--i, 0) * 45ms);
+}
+.bar-label { animation: fade .3s ease-out backwards; animation-delay: calc(650ms + var(--i, 0) * 45ms); }
+.hbar-track span {
+  transform-origin: left;
+  animation: grow-x .6s var(--ease-out) backwards;
+  animation-delay: calc(150ms + var(--i, 0) * 50ms);
+  transition: width .4s var(--ease-out);
+}
+
+/* Smooth theme switching on surfaces, not just the page background. */
+.card, .stat, .qstat, .topbar, .tabs, .tab { transition: background-color .2s, border-color .2s, color .2s; }
+.month-head, .receipt, .bills li { transition: background-color .15s; }
 @keyframes pop { from { opacity: 0; transform: translateY(8px) scale(.98); } }
 @keyframes rise { from { opacity: 0; transform: translate(-50%, 8px); } }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }

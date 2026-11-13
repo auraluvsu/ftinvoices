@@ -85,6 +85,7 @@ export function QuarterChart({ quarters, stagger }: Props) {
                     key={r.start}
                     type="button"
                     className={`bar-col${active === i ? ' active' : ''}${isCurrent ? ' current' : ''}`}
+                    style={{ '--i': i } as React.CSSProperties}
                     onMouseEnter={() => setActive(i)}
                     onFocus={() => setActive(i)}
                     onBlur={() => setActive(null)}

@@ -159,7 +159,7 @@ export function HomePage() {
             <p className="empty-small">No receipts {periodName} yet.</p>
           ) : (
             <ul className="hbars">
-              {categories.map((c) => {
+              {categories.map((c, i) => {
                 const share = periodTotal ? (c.total / periodTotal) * 100 : 0;
                 return (
                   <li key={c.category} title={`${c.count} receipt${c.count === 1 ? '' : 's'} · VAT ${formatMoney(c.vat)}`}>
@@ -170,7 +170,7 @@ export function HomePage() {
                       </span>
                     </div>
                     <div className="hbar-track">
-                      <span style={{ width: `${maxCat ? (c.total / maxCat) * 100 : 0}%` }} />
+                      <span style={{ width: `${maxCat ? (c.total / maxCat) * 100 : 0}%`, '--i': i } as React.CSSProperties} />
                     </div>
                     <span className="hbar-sub muted">
                       {c.count} receipt{c.count === 1 ? '' : 's'} · VAT {formatMoney(c.vat)}
