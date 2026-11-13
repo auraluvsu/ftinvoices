@@ -119,3 +119,19 @@ export function supplierMemory(receipts: Receipt[]): Map<string, Supplier> {
   }
   return map;
 }
+
+/**
+ * Search across all receipts. Words must all match (name or category, any order);
+ * a number like "60" or "12.5" also matches totals/VAT that start with it (60.00, 12.50).
+ */
+export function searchReceipts(receipts: Receipt[], query: string): Receipt[] {
+  const words = query.trim().toLowerCase().replace(/£/g, '').split(/\s+/).filter(Boolean);
+  if (!words.length) return receipts;
+  return receipts.filter((r) => {
+    const text = `${r.name} ${r.category}`.toLowerCase();
+    const amounts = [r.total.toFixed(2), r.vat.toFixed(2)];
+    return words.every(
+      (w) => text.includes(w) || (/^\d+(\.\d{0,2})?$/.test(w) && amounts.some((a) => a.startsWith(w.replace(/\.$/, '')))),
+    );
+  });
+}
