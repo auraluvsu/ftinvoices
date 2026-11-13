@@ -38,6 +38,7 @@ export function ExportMenu({ onExport, disabled, label = 'Export', small }: Prop
         type="button"
         className={`btn btn-secondary${small ? ' btn-sm' : ''}`}
         disabled={disabled}
+        aria-label={label}
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
@@ -45,7 +46,7 @@ export function ExportMenu({ onExport, disabled, label = 'Export', small }: Prop
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
           <path d="M12 3v12m0 0-4-4m4 4 4-4M5 21h14" />
         </svg>
-        {label}
+        <span className="btn-label">{label}</span>
       </button>
       {open && (
         <div className="menu-list" role="menu">

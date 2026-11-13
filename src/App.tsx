@@ -3,12 +3,13 @@ import { RouterProvider } from 'react-router/dom';
 import { AppDataProvider } from './store';
 import { Layout } from './Layout';
 import { ReceiptsPage } from './pages/ReceiptsPage';
+import { HomePage } from './pages/HomePage';
 
 const router = createBrowserRouter([
   {
     element: <Layout />,
     children: [
-      { index: true, element: <Navigate to="/receipts" replace /> },
+      { index: true, element: <HomePage /> },
       { path: 'receipts', element: <ReceiptsPage /> },
       { path: '*', element: <Navigate to="/" replace /> },
     ],

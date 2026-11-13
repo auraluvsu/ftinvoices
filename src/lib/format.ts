@@ -29,3 +29,7 @@ export const newId = () =>
   typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+/** Compact money for axis ticks: £0, £850, £1.2k, £15k. */
+export const formatMoneyShort = (n: number) =>
+  n >= 1000 ? `£${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, '')}k` : `£${Math.round(n)}`;

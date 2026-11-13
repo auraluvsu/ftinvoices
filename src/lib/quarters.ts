@@ -94,3 +94,35 @@ export function categoryBreakdown(receipts: Receipt[]): CategoryTotal[] {
   }
   return [...map.values()].sort((a, b) => b.total - a.total);
 }
+
+/** Two-line axis label: ["Q1", "2026"] for calendar quarters, ["Nov–Jan", "2026"] otherwise. */
+export function axisLabel(start: number, stagger: QuarterStagger): [string, string] {
+  const endYear = String(Math.floor((start + 2) / 12));
+  if (stagger === 0) return [`Q${Math.floor((start % 12) / 3) + 1}`, endYear];
+  return [`${monthName(start, false)}–${monthName(start + 2, false)}`, endYear];
+}
+
+export interface QuarterPoint {
+  start: number;
+  label: string;
+  range: string;
+  receipts: Receipt[];
+}
+
+/** The last `count` quarters up to and including the one containing `todayIso`, oldest first, empty ones included. */
+export function recentQuarters(
+  receipts: Receipt[],
+  stagger: QuarterStagger,
+  todayIso: string,
+  count = 8,
+): QuarterPoint[] {
+  const current = quarterStart(todayIso, stagger);
+  const byStart = new Map(groupByQuarter(receipts, stagger).map((q) => [q.start, q.receipts]));
+  return Array.from({ length: count }, (_, i) => {
+    const start = current - (count - 1 - i) * 3;
+    return { start, ...describe(start, stagger), receipts: byStart.get(start) ?? [] };
+  });
+}
+
+/** First day of the month after the quarter ends, as a Date (local time). */
+export const quarterEndExclusive = (start: number) => new Date(Math.floor((start + 3) / 12), (start + 3) % 12, 1);

@@ -3,7 +3,10 @@ import { useAppData } from './appData';
 import { ExportMenu } from './components/ExportMenu';
 import { ThemeToggle } from './components/ThemeToggle';
 
-const NAV = [{ to: '/receipts', label: 'Receipts' }];
+const NAV = [
+  { to: '/', label: 'Overview' },
+  { to: '/receipts', label: 'Receipts' },
+];
 
 export function Layout() {
   const { receipts, exportList } = useAppData();
