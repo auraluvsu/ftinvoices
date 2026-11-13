@@ -414,6 +414,8 @@ input[type='number']::-webkit-inner-spin-button { opacity: .4; }
 }
 .chip:hover { border-color: var(--accent); }
 .chip.selected { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.field-hint { font-size: .78rem; color: var(--muted); animation: fade .25s var(--ease-out); }
+.field-hint strong { color: var(--text); }
 .filter-summary { font-size: .88rem; color: var(--muted); }
 .filter-summary strong { color: var(--text); }
 .empty-small { padding: 20px; text-align: center; color: var(--muted); }

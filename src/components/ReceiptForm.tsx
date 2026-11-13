@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import type { NewCategory, Receipt, ReceiptDraft } from '../types';
 import { useAppData } from '../appData';
 import { newId, round2, todayIso } from '../lib/format';
 import { catVar, SUGGESTED_COLORS } from '../lib/color';
+import { supplierMemory } from '../lib/receipts';
 import { ImageInput } from './ImageInput';
 import { CategoryColorPicker } from './CategoryColorPicker';
 
@@ -55,7 +56,28 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
   const [draft, setDraft] = useState<Draft>(() => (editing ? fromReceipt(editing) : blank(categories[0])));
   const [errors, setErrors] = useState<Partial<Record<keyof Draft, string>>>({});
   const [saving, setSaving] = useState(false);
-  const { categoryColor } = useAppData();
+  const { categoryColor, receipts } = useAppData();
+  // Supplier memory: typing a known name picks the category last used for it,
+  // unless the category has been chosen by hand.
+  const suppliers = useMemo(() => supplierMemory(receipts), [receipts]);
+  const supplierList = useMemo(
+    () => [...suppliers.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)),
+    [suppliers],
+  );
+  const [categoryTouched, setCategoryTouched] = useState(Boolean(editing));
+  const [remembered, setRemembered] = useState<string | null>(null);
+  const listId = useId();
+
+  const onNameChange = (name: string) => {
+    set('name', name);
+    const hit = suppliers.get(name.trim().toLowerCase());
+    if (hit && !categoryTouched && categories.includes(hit.category)) {
+      set('category', hit.category);
+      setRemembered(hit.category);
+    } else if (!hit) {
+      setRemembered(null);
+    }
+  };
   // Default a new category to the first suggested colour not already in use.
   const usedColors = new Set(categories.map(categoryColor));
   const newColor = draft.newColor || (SUGGESTED_COLORS.find((c) => !usedColors.has(c)) ?? SUGGESTED_COLORS[0]);
@@ -116,6 +138,8 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
     if (ok && !editing) {
       // Keep the category and date — handy when entering a batch of receipts.
       setDraft((d) => ({ ...blank(finalCategory), date: d.date }));
+      setCategoryTouched(false);
+      setRemembered(null);
     }
   };
 
@@ -134,10 +158,21 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
         <input
           type="text"
           value={draft.name}
-          onChange={(e) => set('name', e.target.value)}
+          onChange={(e) => onNameChange(e.target.value)}
           placeholder="e.g. Tesco, Train to Leeds"
           autoComplete="off"
+          list={listId}
         />
+        <datalist id={listId}>
+          {supplierList.map((sup) => (
+            <option key={sup.name} value={sup.name} />
+          ))}
+        </datalist>
+        {remembered && (
+          <span className="field-hint">
+            Category set to <strong>{remembered}</strong> from your last receipt
+          </span>
+        )}
       </Field>
 
       <div className="row-2">
@@ -183,7 +218,14 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
         <Field label="Category" error={errors.category}>
           <div className="select-swatch">
             <span className="dot" style={catVar(selectedColor)} aria-hidden />
-            <select value={draft.category} onChange={(e) => set('category', e.target.value)}>
+            <select
+              value={draft.category}
+              onChange={(e) => {
+                set('category', e.target.value);
+                setCategoryTouched(true);
+                setRemembered(null);
+              }}
+            >
               {categories.map((c) => (
                 <option key={c} value={c}>
                   {c}

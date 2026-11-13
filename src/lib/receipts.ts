@@ -99,3 +99,23 @@ export function groupByYear(months: MonthGroup[]): YearGroup[] {
   }
   return years;
 }
+
+export interface Supplier {
+  /** Name as last written */
+  name: string;
+  /** Category used on the most recent receipt from this supplier */
+  category: string;
+  count: number;
+}
+
+/** Past suppliers keyed by lower-cased, trimmed name, remembering the most recent category. */
+export function supplierMemory(receipts: Receipt[]): Map<string, Supplier> {
+  const sorted = [...receipts].sort((a, b) => a.date.localeCompare(b.date) || a.createdAt - b.createdAt);
+  const map = new Map<string, Supplier>();
+  for (const r of sorted) {
+    const key = r.name.trim().toLowerCase();
+    if (!key) continue;
+    map.set(key, { name: r.name.trim(), category: r.category, count: (map.get(key)?.count ?? 0) + 1 });
+  }
+  return map;
+}
