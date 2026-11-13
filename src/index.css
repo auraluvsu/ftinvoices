@@ -299,7 +299,9 @@ input[type='number']::-webkit-inner-spin-button { opacity: .4; }
   display: grid; grid-template-columns: 22px 44px minmax(0, 1fr) auto; align-items: center; gap: 12px;
   padding: 10px 0; border-top: 1px solid var(--border);
 }
-.bills li:first-child { border-top: none; padding-top: 0; }
+.bills li:first-child { border-top: none; }
+.bills li { padding-left: 6px; padding-right: 6px; border-radius: 8px; }
+.bills li:hover { background: var(--surface-2); }
 .bill-rank { font-weight: 700; color: var(--muted); text-align: center; }
 
 /* ---------- Tabs ---------- */
@@ -417,6 +419,7 @@ input[type='number']::-webkit-inner-spin-button { opacity: .4; }
   padding: 10px 6px; border-bottom: 1px solid var(--border); border-radius: 8px;
 }
 .receipt:last-child { border-bottom: none; }
+.clickable { cursor: pointer; }
 .receipt:hover { background: var(--surface-2); }
 .receipt.editing { background: var(--accent-soft); }
 .thumb {

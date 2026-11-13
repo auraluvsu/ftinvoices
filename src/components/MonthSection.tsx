@@ -179,7 +179,15 @@ export function MonthSection({
           ) : (
             <ul className="receipt-list">
               {visible.map((r) => (
-                <li key={r.id} className={`receipt${editingId === r.id ? ' editing' : ''}`}>
+                <li
+                  key={r.id}
+                  className={`receipt clickable${editingId === r.id ? ' editing' : ''}`}
+                  title="Click to edit"
+                  onClick={(e) => {
+                    // Thumbnail / edit / delete buttons handle their own clicks.
+                    if (!(e.target as HTMLElement).closest('button, a')) onEdit(r);
+                  }}
+                >
                   {r.image ? (
                     <button type="button" className="thumb" onClick={() => onViewImage(r)} aria-label={`View receipt image for ${r.name}`}>
                       <img src={r.image} alt="" loading="lazy" />

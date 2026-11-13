@@ -7,6 +7,7 @@ import { sumTotals } from '../lib/receipts';
 import { categoryBreakdown, quarterEndExclusive, recentQuarters } from '../lib/quarters';
 import { QuarterChart } from '../components/QuarterChart';
 import { ImageModal } from '../components/ImageModal';
+import { EditReceiptModal } from '../components/EditReceiptModal';
 
 type Period = 'quarter' | 'year' | 'all';
 const PERIODS: { value: Period; label: string }[] = [
@@ -18,9 +19,10 @@ const MAX_CATEGORIES = 8;
 const TOP_BILLS = 5;
 
 export function HomePage() {
-  const { receipts, stagger } = useAppData();
+  const { receipts, stagger, categories: allCategories, saveReceipt, notify } = useAppData();
   const [period, setPeriod] = useState<Period>('quarter');
   const [viewing, setViewing] = useState<Receipt | null>(null);
+  const [editing, setEditing] = useState<Receipt | null>(null);
   const today = todayIso();
   const year = today.slice(0, 4);
 
@@ -195,7 +197,14 @@ export function HomePage() {
           ) : (
             <ol className="bills">
               {biggest.map((r, i) => (
-                <li key={r.id}>
+                <li
+                  key={r.id}
+                  className="clickable"
+                  title="Click to edit"
+                  onClick={(e) => {
+                    if (!(e.target as HTMLElement).closest('button, a')) setEditing(r);
+                  }}
+                >
                   <span className="bill-rank">{i + 1}</span>
                   {r.image ? (
                     <button type="button" className="thumb" onClick={() => setViewing(r)} aria-label={`View receipt image for ${r.name}`}>
@@ -227,6 +236,20 @@ export function HomePage() {
       </div>
 
       {viewing?.image && <ImageModal receipt={viewing} onClose={() => setViewing(null)} />}
+      {editing && (
+        <EditReceiptModal
+          key={editing.id}
+          receipt={editing}
+          categories={allCategories}
+          onSave={(r, newCategory) => {
+            const ok = saveReceipt(r, newCategory);
+            if (ok) setEditing(null);
+            return ok;
+          }}
+          onClose={() => setEditing(null)}
+          onError={(m) => notify(m, 'error')}
+        />
+      )}
     </main>
   );
 }
