@@ -1,18 +1,18 @@
 /* ---------- Theme tokens ---------- */
 :root {
   color-scheme: light;
-  /* Light: cream + sage */
+  /* Light: cream + mint */
   --bg: #f6f1e4;
   --surface: #fffcf4;
   --surface-2: #f0eadb;
   --border: #e2dac6;
   --text: #36352c;
   --muted: #7b7764;
-  --accent: #b2ac88;          /* sage */
-  --accent-hover: #a39d77;
-  --accent-ink: #2c2b1f;      /* text on accent */
-  --accent-text: #6b6646;     /* accent used as text — darker for contrast */
-  --accent-soft: #b2ac8833;
+  --accent: #adebb3;          /* mint */
+  --accent-hover: #94e09c;
+  --accent-ink: #1b3a20;      /* text on accent */
+  --accent-text: #3a7d44;     /* accent used as text — darker for contrast */
+  --accent-soft: #adebb34d;
   --danger: #b4483b;
   --danger-soft: #b4483b1a;
   --shadow: 0 1px 2px #3a35200d, 0 4px 16px #3a35200f;
