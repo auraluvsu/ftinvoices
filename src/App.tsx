@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 import { AppDataProvider } from './store';
+import { AuthGate } from './auth';
 import { Layout } from './Layout';
 import { ReceiptsPage } from './pages/ReceiptsPage';
 import { HomePage } from './pages/HomePage';
@@ -18,8 +19,10 @@ const router = createBrowserRouter([
 
 export default function App() {
   return (
-    <AppDataProvider>
-      <RouterProvider router={router} />
-    </AppDataProvider>
+    <AuthGate>
+      <AppDataProvider>
+        <RouterProvider router={router} />
+      </AppDataProvider>
+    </AuthGate>
   );
 }

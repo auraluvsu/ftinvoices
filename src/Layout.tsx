@@ -2,6 +2,7 @@ import { Link, NavLink, Outlet, ScrollRestoration } from 'react-router';
 import { useAppData } from './appData';
 import { ExportMenu } from './components/ExportMenu';
 import { ThemeToggle } from './components/ThemeToggle';
+import { AccountMenu } from './components/AccountMenu';
 
 const NAV = [
   { to: '/', label: 'Overview' },
@@ -38,6 +39,7 @@ export function Layout() {
             disabled={!receipts.length}
             onExport={(fmt) => exportList(receipts, fmt, 'receipts')}
           />
+          <AccountMenu />
         </div>
       </header>
 
