@@ -173,3 +173,28 @@ export async function signImages(paths: string[]): Promise<Map<string, string>> 
   for (const item of data ?? []) if (item.path && item.signedUrl) out.set(item.path, item.signedUrl);
   return out;
 }
+
+// ---------- Receipt scanning (Edge Function → Claude) ----------
+export interface ScanResult {
+  name: string | null;
+  total: number | null;
+  vat: number | null;
+  date: string | null;
+  category: string | null;
+}
+
+export async function scanReceipt(image: string, categories: string[]): Promise<ScanResult> {
+  const { data, error } = await supabase.functions.invoke('scan-receipt', { body: { image, categories } });
+  if (error) {
+    let message = error.message;
+    try {
+      // The function returns { error: "…" } with a friendly message.
+      const body = await (error as { context?: Response }).context?.json();
+      if (body?.error) message = body.error;
+    } catch {
+      /* keep the generic message */
+    }
+    throw new Error(message);
+  }
+  return data as ScanResult;
+}

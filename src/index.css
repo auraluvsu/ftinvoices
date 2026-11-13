@@ -691,3 +691,11 @@ input[type='number']::-webkit-inner-spin-button { opacity: .4; }
   .cat-row-count { display: none; }
   .cat-row-panel { margin-left: 0; }
 }
+
+/* ---------- Receipt scanning ---------- */
+.scan-btn { align-self: flex-start; gap: 8px; }
+.scan-btn[aria-busy='true'] svg { animation: spin 1.2s linear infinite; }
+.field.scanned input, .field.scanned select { animation: scan-flash 2.5s ease-in backwards; }
+@keyframes scan-flash {
+  from, 40% { border-color: var(--chart); box-shadow: 0 0 0 3px var(--accent-soft); background-color: color-mix(in srgb, var(--accent) 18%, var(--surface)); }
+}

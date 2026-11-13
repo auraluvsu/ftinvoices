@@ -4,6 +4,8 @@ import { useAppData } from '../appData';
 import { newId, round2, todayIso } from '../lib/format';
 import { catVar, SUGGESTED_COLORS } from '../lib/color';
 import { supplierMemory } from '../lib/receipts';
+import { urlToDataUrl } from '../lib/image';
+import { scanReceipt } from '../lib/db';
 import { ImageInput } from './ImageInput';
 import { CategoryColorPicker } from './CategoryColorPicker';
 
@@ -67,6 +69,42 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
   const [categoryTouched, setCategoryTouched] = useState(Boolean(editing));
   const [remembered, setRemembered] = useState<string | null>(null);
   const listId = useId();
+
+  // Receipt scanning: fills only the fields that are still empty, then highlights them.
+  const [scanning, setScanning] = useState(false);
+  const [scanned, setScanned] = useState<Set<keyof Draft>>(() => new Set());
+  const scan = async () => {
+    if (!draft.image || scanning) return;
+    setScanning(true);
+    try {
+      const r = await scanReceipt(await urlToDataUrl(draft.image), categories);
+      const patch: Partial<Draft> = {};
+      if (r.name && !draft.name.trim()) patch.name = r.name;
+      if (r.total != null && !draft.total.trim()) patch.total = r.total.toFixed(2);
+      if (r.vat != null && !draft.vat.trim()) patch.vat = r.vat.toFixed(2);
+      if (r.date && (!draft.date || draft.date === todayIso())) patch.date = r.date;
+      if (!categoryTouched && draft.category !== NEW_CATEGORY) {
+        // Your own past choice for this supplier beats the model's guess.
+        const remembered = suppliers.get((patch.name ?? draft.name).trim().toLowerCase())?.category;
+        const pick = remembered && categories.includes(remembered) ? remembered : r.category;
+        if (pick && pick !== draft.category) patch.category = pick;
+        if (remembered && pick === remembered) setRemembered(remembered);
+      }
+      const keys = Object.keys(patch) as (keyof Draft)[];
+      if (!keys.length) {
+        onError(r.total == null && !r.name ? 'Couldn’t read anything from this image' : 'Nothing new to fill in — the fields are already set');
+        return;
+      }
+      setDraft((d) => ({ ...d, ...patch }));
+      setErrors({});
+      setScanned(new Set(keys));
+      setTimeout(() => setScanned(new Set()), 2500);
+    } catch (e) {
+      onError(`Couldn’t read the receipt: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setScanning(false);
+    }
+  };
 
   const onNameChange = (name: string) => {
     set('name', name);
@@ -157,7 +195,7 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
         )}
       </div>
 
-      <Field label="Name" error={errors.name}>
+      <Field label="Name" error={errors.name} highlight={scanned.has('name')}>
         <input
           type="text"
           value={draft.name}
@@ -179,7 +217,7 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
       </Field>
 
       <div className="row-2">
-        <Field label="Total (inc. VAT)" error={errors.total}>
+        <Field label="Total (inc. VAT)" error={errors.total} highlight={scanned.has('total')}>
           <div className="money-input">
             <span>£</span>
             <input
@@ -196,6 +234,7 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
         <Field
           label="VAT"
           error={errors.vat}
+          highlight={scanned.has('vat')}
           action={
             <button type="button" className="link-btn" onClick={calcVat} title="Calculate 20% VAT from the total">
               Calc 20%
@@ -218,7 +257,7 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
       </div>
 
       <div className="row-2">
-        <Field label="Category" error={errors.category}>
+        <Field label="Category" error={errors.category} highlight={scanned.has('category')}>
           <div className="select-swatch">
             <span className="dot" style={catVar(selectedColor)} aria-hidden />
             <select
@@ -238,7 +277,7 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
             </select>
           </div>
         </Field>
-        <Field label="Date" error={errors.date}>
+        <Field label="Date" error={errors.date} highlight={scanned.has('date')}>
           <input type="date" value={draft.date} onChange={(e) => set('date', e.target.value)} />
         </Field>
       </div>
@@ -259,6 +298,14 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
       <Field label="Receipt image (optional)">
         <ImageInput value={draft.image} onChange={(v) => set('image', v)} onError={onError} />
       </Field>
+      {draft.image && (
+        <button type="button" className="btn btn-secondary scan-btn" onClick={scan} disabled={scanning} aria-busy={scanning}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+            <path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z" />
+          </svg>
+          {scanning ? 'Reading receipt…' : 'Read receipt'}
+        </button>
+      )}
 
       {editing ? (
         <div className="form-actions">
@@ -282,15 +329,18 @@ function Field({
   label,
   error,
   action,
+  highlight,
   children,
 }: {
   label: string;
   error?: string;
   action?: React.ReactNode;
+  /** Briefly marks a field that was just filled in by scanning. */
+  highlight?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <label className={`field${error ? ' has-error' : ''}`}>
+    <label className={`field${error ? ' has-error' : ''}${highlight ? ' scanned' : ''}`}>
       <span className="field-label">
         {label}
         {action}
