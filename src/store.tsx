@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { Receipt } from './types';
+import { DEFAULT_CATEGORY_COLORS, fallbackColor } from './lib/color';
 import { AppDataContext as Ctx, type AppData, type Toast } from './appData';
 import { isQuotaError, useLocalStorage } from './lib/storage';
 import { exportReceipts } from './lib/export';
@@ -16,11 +17,13 @@ const DEFAULT_CATEGORIES = [
   'Other',
 ];
 const NO_RECEIPTS: Receipt[] = [];
+const NO_COLORS: Record<string, string> = {};
 
 /** Owns all persisted data (receipts, categories, settings) and app-wide toasts. */
 export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const [receipts, setReceipts] = useLocalStorage<Receipt[]>('ftinvoices.receipts', NO_RECEIPTS);
   const [storedCategories, setCategories] = useLocalStorage<string[]>('ftinvoices.categories', DEFAULT_CATEGORIES);
+  const [storedColors, setColors] = useLocalStorage<Record<string, string>>('ftinvoices.categoryColors', NO_COLORS);
   const [stagger, setStaggerStored] = useLocalStorage<QuarterStagger>('ftinvoices.vatQuarterStagger', 0);
   const [toast, setToast] = useState<Toast | null>(null);
 
@@ -36,6 +39,11 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     return [...all].sort((a, b) => (a === 'Other' ? 1 : b === 'Other' ? -1 : a.localeCompare(b)));
   }, [storedCategories, receipts]);
 
+  const categoryColor = useCallback(
+    (name: string) => storedColors[name] ?? DEFAULT_CATEGORY_COLORS[name] ?? fallbackColor(name),
+    [storedColors],
+  );
+
   const value = useMemo<AppData>(() => {
     const saveFailed = (error: unknown) =>
       notify(
@@ -48,6 +56,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     return {
       receipts,
       categories,
+      categoryColor,
       stagger,
       setStagger: (s) => setStaggerStored(() => s),
       saveReceipt: (receipt, newCategory) => {
@@ -59,7 +68,10 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
           saveFailed(res.error);
           return false;
         }
-        if (newCategory) setCategories((prev) => [...prev, newCategory]);
+        if (newCategory) {
+          setCategories((prev) => [...prev, newCategory.name]);
+          setColors((prev) => ({ ...prev, [newCategory.name]: newCategory.color }));
+        }
         notify(isEdit ? 'Receipt updated' : `Added “${receipt.name}”`);
         return true;
       },
@@ -82,7 +94,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       },
       notify,
     };
-  }, [receipts, categories, stagger, setReceipts, setCategories, setStaggerStored, notify]);
+  }, [receipts, categories, categoryColor, stagger, setReceipts, setCategories, setColors, setStaggerStored, notify]);
 
   return (
     <Ctx.Provider value={value}>

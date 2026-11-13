@@ -5,6 +5,8 @@ import { sumTotals } from '../lib/receipts';
 import { categoryBreakdown, groupByQuarter, STAGGER_OPTIONS, type QuarterGroup, type QuarterStagger } from '../lib/quarters';
 import type { ExportFormat } from '../lib/export';
 import { ExportMenu } from './ExportMenu';
+import { useAppData } from '../appData';
+import { catVar } from '../lib/color';
 
 interface Props {
   receipts: Receipt[];
@@ -54,6 +56,7 @@ function QuarterCard({
   onExport: Props['onExport'];
 }) {
   const t = sumTotals(quarter.receipts);
+  const { categoryColor } = useAppData();
   const cats = categoryBreakdown(quarter.receipts);
   const prevTotal = previous ? sumTotals(previous.receipts).total : null;
   const change = prevTotal ? ((t.total - prevTotal) / prevTotal) * 100 : null;
@@ -127,14 +130,17 @@ function QuarterCard({
             {cats.map((c) => (
               <li key={c.category}>
                 <div className="cat-bar-label">
-                  <span>{c.category}</span>
+                  <span>
+                    <span className="dot" style={catVar(categoryColor(c.category))} aria-hidden />
+                    {c.category}
+                  </span>
                   <span>
                     <strong>{formatMoney(c.total)}</strong>
                     <span className="muted"> · VAT {formatMoney(c.vat)}</span>
                   </span>
                 </div>
                 <div className="cat-bar" aria-hidden>
-                  <span style={{ width: `${t.total ? (c.total / t.total) * 100 : 0}%` }} />
+                  <span style={catVar(categoryColor(c.category), { width: `${t.total ? (c.total / t.total) * 100 : 0}%` })} />
                 </div>
               </li>
             ))}

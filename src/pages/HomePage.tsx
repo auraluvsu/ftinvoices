@@ -4,10 +4,11 @@ import type { Receipt } from '../types';
 import { useAppData } from '../appData';
 import { formatDate, formatMoney, todayIso } from '../lib/format';
 import { sumTotals } from '../lib/receipts';
-import { categoryBreakdown, quarterEndExclusive, recentQuarters } from '../lib/quarters';
+import { categoryBreakdown, quarterEndExclusive, recentQuarters, type CategoryTotal } from '../lib/quarters';
 import { QuarterChart } from '../components/QuarterChart';
 import { ImageModal } from '../components/ImageModal';
 import { EditReceiptModal } from '../components/EditReceiptModal';
+import { catVar, NEUTRAL_COLOR } from '../lib/color';
 
 type Period = 'quarter' | 'year' | 'all';
 const PERIODS: { value: Period; label: string }[] = [
@@ -19,7 +20,7 @@ const MAX_CATEGORIES = 8;
 const TOP_BILLS = 5;
 
 export function HomePage() {
-  const { receipts, stagger, categories: allCategories, saveReceipt, notify } = useAppData();
+  const { receipts, stagger, categories: allCategories, categoryColor, saveReceipt, notify } = useAppData();
   const [period, setPeriod] = useState<Period>('quarter');
   const [viewing, setViewing] = useState<Receipt | null>(null);
   const [editing, setEditing] = useState<Receipt | null>(null);
@@ -43,7 +44,7 @@ export function HomePage() {
   );
   const periodTotal = sumTotals(periodReceipts).total;
 
-  const categories = useMemo(() => {
+  const categories = useMemo((): (CategoryTotal & { folded?: boolean })[] => {
     const all = categoryBreakdown(periodReceipts);
     if (all.length <= MAX_CATEGORIES) return all;
     // Fold the long tail into one row rather than inventing more rows.
@@ -51,9 +52,9 @@ export function HomePage() {
     const tail = all.slice(MAX_CATEGORIES - 1);
     return [
       ...head,
-      tail.reduce(
+      tail.reduce<CategoryTotal & { folded?: boolean }>(
         (acc, c) => ({ ...acc, count: acc.count + c.count, total: acc.total + c.total, vat: acc.vat + c.vat }),
-        { category: `${tail.length} other categories`, count: 0, total: 0, vat: 0 },
+        { category: `${tail.length} other categories`, count: 0, total: 0, vat: 0, folded: true },
       ),
     ];
   }, [periodReceipts]);
@@ -161,16 +162,20 @@ export function HomePage() {
             <ul className="hbars">
               {categories.map((c, i) => {
                 const share = periodTotal ? (c.total / periodTotal) * 100 : 0;
+                const color = c.folded ? NEUTRAL_COLOR : categoryColor(c.category);
                 return (
                   <li key={c.category} title={`${c.count} receipt${c.count === 1 ? '' : 's'} · VAT ${formatMoney(c.vat)}`}>
                     <div className="hbar-label">
-                      <span className="hbar-name">{c.category}</span>
+                      <span className="hbar-name">
+                        <span className="dot" style={catVar(color)} aria-hidden />
+                        {c.category}
+                      </span>
                       <span className="hbar-value">
                         <strong>{formatMoney(c.total)}</strong> <span className="muted">{share.toFixed(0)}%</span>
                       </span>
                     </div>
                     <div className="hbar-track">
-                      <span style={{ width: `${maxCat ? (c.total / maxCat) * 100 : 0}%`, '--i': i } as React.CSSProperties} />
+                      <span style={catVar(color, { width: `${maxCat ? (c.total / maxCat) * 100 : 0}%`, '--i': i } as React.CSSProperties)} />
                     </div>
                     <span className="hbar-sub muted">
                       {c.count} receipt{c.count === 1 ? '' : 's'} · VAT {formatMoney(c.vat)}
@@ -220,7 +225,7 @@ export function HomePage() {
                   <div className="receipt-main">
                     <span className="receipt-name">{r.name}</span>
                     <span className="receipt-meta">
-                      <span className="tag">{r.category}</span>
+                      <span className="tag" style={catVar(categoryColor(r.category))}>{r.category}</span>
                       <span className="muted">{formatDate(r.date)}</span>
                     </span>
                   </div>

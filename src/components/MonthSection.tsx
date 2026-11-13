@@ -4,6 +4,8 @@ import { formatDate, formatMoney, formatMonthKey } from '../lib/format';
 import { activeFilterCount, applyFilters, sortReceipts, sumTotals } from '../lib/receipts';
 import type { ExportFormat } from '../lib/export';
 import { ExportMenu } from './ExportMenu';
+import { useAppData } from '../appData';
+import { catVar } from '../lib/color';
 
 interface Props {
   monthKey: string;
@@ -33,6 +35,7 @@ export function MonthSection({
   onViewImage,
   onExport,
 }: Props) {
+  const { categoryColor } = useAppData();
   const [open, setOpen] = useState(defaultOpen);
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
@@ -153,6 +156,7 @@ export function MonthSection({
                       className={`chip${filters.categories.includes(c) ? ' selected' : ''}`}
                       aria-pressed={filters.categories.includes(c)}
                       onClick={() => toggleCategory(c)}>
+                      <span className="dot" style={catVar(categoryColor(c))} aria-hidden />
                       {c}
                     </button>
                   ))}
@@ -202,7 +206,7 @@ export function MonthSection({
                   <div className="receipt-main">
                     <span className="receipt-name">{r.name}</span>
                     <span className="receipt-meta">
-                      <span className="tag">{r.category}</span>
+                      <span className="tag" style={catVar(categoryColor(r.category))}>{r.category}</span>
                       <span className="muted">{formatDate(r.date)}</span>
                     </span>
                   </div>

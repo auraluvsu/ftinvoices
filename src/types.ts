@@ -13,6 +13,12 @@ export interface Receipt {
   createdAt: number;
 }
 
+/** A category created while saving a receipt. */
+export interface NewCategory {
+  name: string;
+  color: string;
+}
+
 export type SortField = 'date' | 'total' | 'vat' | 'name';
 export type SortDir = 'asc' | 'desc';
 

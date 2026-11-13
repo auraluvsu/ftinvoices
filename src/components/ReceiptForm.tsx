@@ -1,7 +1,10 @@
 import { useState } from 'react';
-import type { Receipt } from '../types';
+import type { NewCategory, Receipt } from '../types';
+import { useAppData } from '../appData';
 import { newId, round2, todayIso } from '../lib/format';
+import { catVar, SUGGESTED_COLORS } from '../lib/color';
 import { ImageInput } from './ImageInput';
+import { CategoryColorPicker } from './CategoryColorPicker';
 
 const NEW_CATEGORY = '__new__';
 const UK_VAT_RATE = 0.2;
@@ -9,7 +12,7 @@ const UK_VAT_RATE = 0.2;
 interface Props {
   categories: string[];
   editing: Receipt | null;
-  onSave: (receipt: Receipt, newCategory?: string) => boolean;
+  onSave: (receipt: Receipt, newCategory?: NewCategory) => boolean;
   onCancelEdit?: () => void;
   onError: (msg: string) => void;
 }
@@ -20,6 +23,7 @@ interface Draft {
   vat: string;
   category: string;
   newCategory: string;
+  newColor: string;
   date: string;
   image?: string;
 }
@@ -30,6 +34,7 @@ const blank = (category = ''): Draft => ({
   vat: '',
   category,
   newCategory: '',
+  newColor: '',
   date: todayIso(),
   image: undefined,
 });
@@ -40,6 +45,7 @@ const fromReceipt = (r: Receipt): Draft => ({
   vat: r.vat.toFixed(2),
   category: r.category,
   newCategory: '',
+  newColor: '',
   date: r.date,
   image: r.image,
 });
@@ -48,6 +54,11 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
   // The parent remounts this form (via `key`) when switching between add/edit.
   const [draft, setDraft] = useState<Draft>(() => (editing ? fromReceipt(editing) : blank(categories[0])));
   const [errors, setErrors] = useState<Partial<Record<keyof Draft, string>>>({});
+  const { categoryColor } = useAppData();
+  // Default a new category to the first suggested colour not already in use.
+  const usedColors = new Set(categories.map(categoryColor));
+  const newColor = draft.newColor || (SUGGESTED_COLORS.find((c) => !usedColors.has(c)) ?? SUGGESTED_COLORS[0]);
+  const selectedColor = draft.category === NEW_CATEGORY ? newColor : categoryColor(draft.category);
 
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => {
     setDraft((d) => ({ ...d, [k]: v }));
@@ -98,7 +109,7 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
       image: draft.image,
     };
 
-    if (onSave(receipt, isNew && !existing ? finalCategory : undefined)) {
+    if (onSave(receipt, isNew && !existing ? { name: finalCategory, color: newColor } : undefined)) {
       // Keep the category and date — handy when entering a batch of receipts.
       setDraft((d) => ({ ...blank(finalCategory), date: d.date }));
     }
@@ -166,14 +177,17 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
 
       <div className="row-2">
         <Field label="Category" error={errors.category}>
-          <select value={draft.category} onChange={(e) => set('category', e.target.value)}>
-            {categories.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-            <option value={NEW_CATEGORY}>＋ New category…</option>
-          </select>
+          <div className="select-swatch">
+            <span className="dot" style={catVar(selectedColor)} aria-hidden />
+            <select value={draft.category} onChange={(e) => set('category', e.target.value)}>
+              {categories.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+              <option value={NEW_CATEGORY}>＋ New category…</option>
+            </select>
+          </div>
         </Field>
         <Field label="Date" error={errors.date}>
           <input type="date" value={draft.date} onChange={(e) => set('date', e.target.value)} />
@@ -191,6 +205,7 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
           />
         </Field>
       )}
+      {draft.category === NEW_CATEGORY && <CategoryColorPicker value={newColor} onChange={(c) => set('newColor', c)} />}
 
       <Field label="Receipt image (optional)">
         <ImageInput value={draft.image} onChange={(v) => set('image', v)} onError={onError} />

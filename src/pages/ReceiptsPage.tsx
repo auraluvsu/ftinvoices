@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import type { Receipt } from '../types';
+import type { NewCategory, Receipt } from '../types';
 import { useAppData } from '../appData';
 import { groupByMonth, groupByYear, sumTotals } from '../lib/receipts';
 import { formatMoney } from '../lib/format';
@@ -36,7 +36,7 @@ export function ReceiptsPage() {
   const usage = useMemo(() => JSON.stringify(receipts).length * 2, [receipts]);
   const usagePct = Math.min(100, (usage / STORAGE_LIMIT) * 100);
 
-  const handleSave = (receipt: Receipt, newCategory?: string) => {
+  const handleSave = (receipt: Receipt, newCategory?: NewCategory) => {
     const ok = saveReceipt(receipt, newCategory);
     if (ok) setEditing(null);
     return ok;
