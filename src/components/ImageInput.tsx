@@ -9,6 +9,7 @@ interface Props {
 
 export function ImageInput({ value, onChange, onError }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -25,12 +26,15 @@ export function ImageInput({ value, onChange, onError }: Props) {
   };
 
   // Paste an image from anywhere on the page while the form is shown.
+  // When a popup is open, only the input inside that popup takes the paste.
   const acceptRef = useRef(accept);
   useEffect(() => {
     acceptRef.current = accept;
   });
   useEffect(() => {
     const onPaste = (e: ClipboardEvent) => {
+      const modal = document.querySelector('[aria-modal="true"]');
+      if (modal && !modal.contains(rootRef.current)) return;
       const file = imageFromDataTransfer(e.clipboardData);
       if (file) {
         e.preventDefault();
@@ -43,7 +47,7 @@ export function ImageInput({ value, onChange, onError }: Props) {
 
   if (value) {
     return (
-      <div className="image-preview">
+      <div className="image-preview" ref={rootRef}>
         <img src={value} alt="Receipt preview" />
         <div className="image-preview-actions">
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => fileRef.current?.click()}>
@@ -60,6 +64,7 @@ export function ImageInput({ value, onChange, onError }: Props) {
 
   return (
     <div
+      ref={rootRef}
       className={`dropzone${dragging ? ' dragging' : ''}`}
       role="button"
       tabIndex={0}

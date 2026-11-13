@@ -8,6 +8,7 @@ import { ReceiptForm } from './components/ReceiptForm';
 import { MonthSection } from './components/MonthSection';
 import { ExportMenu } from './components/ExportMenu';
 import { ImageModal } from './components/ImageModal';
+import { EditReceiptModal } from './components/EditReceiptModal';
 import { ThemeToggle } from './components/ThemeToggle';
 
 const DEFAULT_CATEGORIES = [
@@ -97,11 +98,6 @@ export default function App() {
     }
   };
 
-  const handleEdit = (r: Receipt) => {
-    setEditing(r);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
   const usagePct = Math.min(100, (usage / STORAGE_LIMIT) * 100);
 
   return (
@@ -128,11 +124,9 @@ export default function App() {
       <main className="layout">
         <aside className="sidebar">
           <ReceiptForm
-            key={editing?.id ?? 'new'}
             categories={categories}
-            editing={editing}
+            editing={null}
             onSave={handleSave}
-            onCancelEdit={() => setEditing(null)}
             onError={(m) => notify(m, 'error')}
           />
           <div className={`storage${usagePct > 80 ? ' warn' : ''}`} title="Approximate browser storage used">
@@ -165,7 +159,7 @@ export default function App() {
                 receipts={m.receipts}
                 defaultOpen={i === 0}
                 editingId={editing?.id}
-                onEdit={handleEdit}
+                onEdit={setEditing}
                 onDelete={handleDelete}
                 onViewImage={setViewing}
                 onExport={handleExport}
@@ -174,6 +168,17 @@ export default function App() {
           )}
         </div>
       </main>
+
+      {editing && (
+        <EditReceiptModal
+          key={editing.id}
+          receipt={editing}
+          categories={categories}
+          onSave={handleSave}
+          onClose={() => setEditing(null)}
+          onError={(m) => notify(m, 'error')}
+        />
+      )}
 
       {viewing?.image && <ImageModal receipt={viewing} onClose={() => setViewing(null)} />}
 

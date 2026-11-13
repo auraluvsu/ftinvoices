@@ -10,7 +10,7 @@ interface Props {
   categories: string[];
   editing: Receipt | null;
   onSave: (receipt: Receipt, newCategory?: string) => boolean;
-  onCancelEdit: () => void;
+  onCancelEdit?: () => void;
   onError: (msg: string) => void;
 }
 
@@ -36,8 +36,8 @@ const blank = (category = ''): Draft => ({
 
 const fromReceipt = (r: Receipt): Draft => ({
   name: r.name,
-  total: String(r.total),
-  vat: String(r.vat),
+  total: r.total.toFixed(2),
+  vat: r.vat.toFixed(2),
   category: r.category,
   newCategory: '',
   date: r.date,
@@ -109,8 +109,8 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
       <div className="card-head">
         <h2>{editing ? 'Edit receipt' : 'Add receipt'}</h2>
         {editing && (
-          <button type="button" className="btn btn-ghost btn-sm" onClick={onCancelEdit}>
-            Cancel
+          <button type="button" className="btn btn-ghost btn-icon" onClick={onCancelEdit} aria-label="Close">
+            ✕
           </button>
         )}
       </div>
@@ -196,9 +196,20 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
         <ImageInput value={draft.image} onChange={(v) => set('image', v)} onError={onError} />
       </Field>
 
-      <button type="submit" className="btn btn-primary btn-block">
-        {editing ? 'Save changes' : 'Add receipt'}
-      </button>
+      {editing ? (
+        <div className="form-actions">
+          <button type="button" className="btn btn-secondary" onClick={onCancelEdit}>
+            Cancel
+          </button>
+          <button type="submit" className="btn btn-primary">
+            Save changes
+          </button>
+        </div>
+      ) : (
+        <button type="submit" className="btn btn-primary btn-block">
+          Add receipt
+        </button>
+      )}
     </form>
   );
 }
