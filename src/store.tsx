@@ -50,6 +50,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const [urls, setUrls] = useState<Map<string, string>>(() => new Map());
   const [toast, setToast] = useState<Toast | null>(null);
   const storedRef = useRef(stored);
+  /** When image links were last signed (ms); used to spot links that may have expired. */
+  const signedAtRef = useRef(0);
   useEffect(() => {
     storedRef.current = stored;
   }, [stored]);
@@ -112,13 +114,27 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   }, [fetchBooks]);
 
   // Signed URLs expire; refresh them periodically while the app stays open.
+  // Timers pause while the computer sleeps, so also check when the tab is shown or focused again.
   useEffect(() => {
     if (phase.kind !== 'ready') return;
-    const t = setInterval(() => {
+    // Becoming ready means fetchBooks has just signed every link.
+    signedAtRef.current = Date.now();
+    const resign = () => {
       const paths = storedRef.current.flatMap((r) => (r.imagePath ? [r.imagePath] : []));
+      signedAtRef.current = Date.now();
       db.signImages(paths).then((m) => setUrls((prev) => new Map([...prev, ...m])), console.error);
-    }, RESIGN_EVERY_MS);
-    return () => clearInterval(t);
+    };
+    const resignIfStale = () => {
+      if (document.visibilityState === 'visible' && Date.now() - signedAtRef.current >= RESIGN_EVERY_MS) resign();
+    };
+    const t = setInterval(resign, RESIGN_EVERY_MS);
+    document.addEventListener('visibilitychange', resignIfStale);
+    window.addEventListener('focus', resignIfStale);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener('visibilitychange', resignIfStale);
+      window.removeEventListener('focus', resignIfStale);
+    };
   }, [phase.kind]);
 
   const categoryNames = useMemo(() => new Map(categoryList.map((c) => [c.id, c.name])), [categoryList]);
