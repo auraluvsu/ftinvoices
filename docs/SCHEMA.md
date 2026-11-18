@@ -92,4 +92,6 @@ Signed-out requests (anon key with no session) see nothing.
 
 ## How the app maps rows
 
+`src/lib/database.types.ts` describes these tables for TypeScript, so a misspelt column or wrong value type fails the build. After changing `schema.sql`, run `SUPABASE_PROJECT_REF=<ref> npm run gen:types` and commit the result.
+
 `src/lib/db.ts` converts rows to the app's `Receipt` shape (camelCase, numbers as numbers, timestamps as milliseconds). The category **name** isn't stored on receipts. It's joined from `categories` by `category_id`, so renaming a category updates every receipt instantly.
