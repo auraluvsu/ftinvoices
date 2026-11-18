@@ -296,7 +296,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
           await exportReceipts(list, format, label, { client: client.name, vatNumber: client.vatNumber });
         } catch (e) {
           console.error(e);
-          notify('Export failed', 'error');
+          notify(`Export failed: ${errMsg(e)}`, 'error');
         }
       },
       notify,
