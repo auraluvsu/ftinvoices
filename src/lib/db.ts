@@ -183,9 +183,18 @@ export interface ScanResult {
   category: string | null;
 }
 
+/** Thrown when the scan-receipt function isn't deployed in this Supabase project. */
+export class ScanUnavailableError extends Error {
+  constructor() {
+    super('Receipt reading isn’t set up yet (the scan-receipt function isn’t deployed)');
+    this.name = 'ScanUnavailableError';
+  }
+}
+
 export async function scanReceipt(image: string, categories: string[]): Promise<ScanResult> {
   const { data, error } = await supabase.functions.invoke('scan-receipt', { body: { image, categories } });
   if (error) {
+    if ((error as { context?: Response }).context?.status === 404) throw new ScanUnavailableError();
     let message = error.message;
     try {
       // The function returns { error: "…" } with a friendly message.
