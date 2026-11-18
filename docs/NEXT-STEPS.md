@@ -60,6 +60,7 @@ These came up while planning and haven't been built yet.
 - UK tax year (6 April – 5 April) totals alongside calendar years.
 
 **Data and backup**
+- One-click backup and restore of a client's books.
 - Delete a client (with its images) from Client settings.
 
 **Faster entry**
