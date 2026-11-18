@@ -88,7 +88,8 @@ Signed-out requests (anon key with no session) see nothing.
 - Files are stored as `{user_id}/{client_id}/{receipt_id}-{timestamp}.jpg`. The timestamp makes a replaced image get a new path, so a cached old link never shows the wrong picture.
 - A storage policy allows access only when the first folder of the path is the signed-in user's id.
 - The app displays images through signed links that expire after 12 hours and re-creates them every 6 hours while open.
-- When an image is replaced or removed, the old file is deleted. When a receipt is deleted, its image is kept for a few seconds so Undo can restore it, then deleted.
+- When an image is replaced or removed, the old file is deleted. When a receipt is deleted, its image is kept for a few seconds so Undo can restore it, then deleted. If the tab closes during those seconds, the delete is sent straight away.
+- **Client settings → Check for unused photos** finds files in the client's folder that no receipt points at (for example, left by a failed request) and offers to delete them.
 
 ## How the app maps rows
 
