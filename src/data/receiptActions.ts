@@ -1,6 +1,8 @@
 import type { Dispatch, SetStateAction } from 'react';
 import type { AppData } from '../appData';
-import type { Category, FiledQuarter } from '../types';
+import type { Category, FiledQuarter, RecurringExpense } from '../types';
+import { frequencyLabel } from '../lib/recurring';
+import { recurringFromReceipt } from './recurringActions';
 import { formatDate } from '../lib/format';
 import { dataUrlToBlob } from '../lib/image';
 import * as db from '../lib/db';
@@ -23,6 +25,7 @@ export interface ReceiptActionDeps {
   cancelImageDelete: (path: string) => void;
   /** The filed quarter locking a date, if any (the database enforces this too). */
   lockedBy: (date: string) => FiledQuarter | undefined;
+  setRecurring: Dispatch<SetStateAction<RecurringExpense[]>>;
 }
 
 const lockedMessage = (f: FiledQuarter) =>
@@ -43,6 +46,7 @@ export function receiptActions({
   scheduleImageDelete,
   cancelImageDelete,
   lockedBy,
+  setRecurring,
 }: ReceiptActionDeps): Pick<AppData, 'saveReceipt' | 'deleteReceipt' | 'deleteReceipts' | 'moveReceipts'> {
   return {
     saveReceipt: async (draft, newCategory) => {
@@ -97,7 +101,18 @@ export function receiptActions({
         if (existing?.imagePath && existing.imagePath !== imagePath) {
           db.removeImages([existing.imagePath]).catch(console.error);
         }
-        notify(existing ? 'Receipt updated' : `Added “${draft.name}”`);
+        let repeats = '';
+        if (!existing && draft.repeat) {
+          try {
+            const created = await db.insertRecurring(recurringFromReceipt(saved, draft.repeat));
+            setRecurring((prev) => [...prev, created]);
+            repeats = ` · repeats ${frequencyLabel(draft.repeat).toLowerCase()}`;
+          } catch (e) {
+            notify(`Added “${draft.name}”, but couldn’t set it to repeat: ${errMsg(e)}`, 'error');
+            return true;
+          }
+        }
+        notify(existing ? 'Receipt updated' : `Added “${draft.name}”${repeats}`);
         return true;
       } catch (e) {
         if (uploadedPath) db.removeImages([uploadedPath]).catch(console.error);

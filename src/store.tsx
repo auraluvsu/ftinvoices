@@ -15,6 +15,9 @@ import { useBooks } from './data/useBooks';
 import { categoryActions } from './data/categoryActions';
 import { receiptActions } from './data/receiptActions';
 import { filedActions } from './data/filedActions';
+import { recurringActions } from './data/recurringActions';
+import { dueDates } from './lib/recurring';
+import { todayIso } from './lib/format';
 import { filedQuarterFor } from './lib/filedQuarters';
 import { useReceiptImages, useResignImages } from './data/useReceiptImages';
 
@@ -30,9 +33,17 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const { urls, replaceUrls, mergeUrls, showLocal, scheduleImageDelete, cancelImageDelete, isPendingDelete } =
     useReceiptImages(session.access_token);
   const { toast, notify, dismiss: dismissToast } = useToasts();
-  const { phase, clients, setClients, client, categoryList, setCategoryList, stored, setStored, filed, setFiled, reload } =
+  const { phase, clients, setClients, client, categoryList, setCategoryList, stored, setStored, filed, setFiled, recurring, setRecurring, reload } =
     useBooks(replaceUrls);
   const lockedBy = useCallback((date: string) => filedQuarterFor(date, filed), [filed]);
+  // Worked out when the books load or change; a tab left open past midnight picks up new ones on refresh.
+  const dueRecurring = useMemo(() => {
+    const today = todayIso();
+    return recurring.flatMap((expense) => {
+      const dates = dueDates(expense, today);
+      return dates.length ? [{ expense, dates }] : [];
+    });
+  }, [recurring]);
 
   const createClient = useCallback(
     async (c: Omit<Client, 'id'>) => {
@@ -94,7 +105,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       categoryList,
       categoryColor,
       openCategoryManager: () => setManagingCategories(true),
-      ...categoryActions({ clientId: client.id, categoryList, setCategoryList, setStored, notify }),
+      ...categoryActions({ clientId: client.id, categoryList, setCategoryList, setStored, setRecurring, notify }),
       stagger: client.stagger,
 
       ...receiptActions({
@@ -111,6 +122,17 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         scheduleImageDelete,
         cancelImageDelete,
         lockedBy,
+        setRecurring,
+      }),
+      recurring,
+      dueRecurring,
+      ...recurringActions({
+        clientId: client.id,
+        categoryList,
+        setStored,
+        setRecurring,
+        reloadSilently: () => void reload(client.id, { silent: true }),
+        notify,
       }),
       filedQuarters: filed,
       lockedBy,
@@ -126,7 +148,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       },
       notify,
     };
-  }, [client, clients, reload, stored, receipts, categories, categoryList, categoryColor, userId, notify, dismissToast, setStored, setCategoryList, scheduleImageDelete, cancelImageDelete, showLocal, filed, setFiled, lockedBy]);
+  }, [client, clients, reload, stored, receipts, categories, categoryList, categoryColor, userId, notify, dismissToast, setStored, setCategoryList, scheduleImageDelete, cancelImageDelete, showLocal, filed, setFiled, lockedBy, recurring, setRecurring, dueRecurring]);
 
   if (phase.kind !== 'ready' || !value) {
     return (

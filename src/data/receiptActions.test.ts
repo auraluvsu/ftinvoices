@@ -48,6 +48,7 @@ function setup() {
     showLocal: vi.fn(),
     scheduleImageDelete: vi.fn(),
     cancelImageDelete: vi.fn(),
+    setRecurring: vi.fn(),
     lockedBy: vi.fn((date: string) =>
       date >= '2026-07-01' && date <= '2026-09-30'
         ? { id: 'f', clientId: 'k', start: '2026-07-01', end: '2026-09-30', filedAt: '2026-10-20T09:00:00Z', box4: 0, box7: 0 }

@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import type { Category, Client, FiledQuarter, NewCategory, Receipt, ReceiptDraft } from './types';
+import type { Category, Client, FiledQuarter, NewCategory, Receipt, ReceiptDraft, RecurringExpense } from './types';
 import type { ExportFormat } from './lib/export';
 import type { QuarterStagger } from './lib/quarters';
 
@@ -49,6 +49,19 @@ export interface AppData {
   /** Marks a quarter as filed, storing its Box 4 and Box 7. `label` is for the toast. */
   fileQuarter: (period: { from: string; to: string }, boxes: { box4: number; box7: number }, label: string) => Promise<boolean>;
   unfileQuarter: (filed: FiledQuarter, label: string) => Promise<boolean>;
+  /** Recurring expenses, soonest first. */
+  recurring: RecurringExpense[];
+  /** Recurring expenses with dates due up to today, waiting for review. */
+  dueRecurring: { expense: RecurringExpense; dates: string[] }[];
+  /**
+   * Handles every due date of one recurring expense: those marked `add` become receipts (with the
+   * amounts given), the rest are skipped. Resolves false if nothing changed.
+   */
+  applyRecurring: (
+    expense: RecurringExpense,
+    entries: { date: string; add: boolean; total: number; vat: number }[],
+  ) => Promise<boolean>;
+  deleteRecurring: (expense: RecurringExpense) => Promise<boolean>;
   notify: (msg: string, kind?: Toast['kind'], undo?: () => void) => void;
 }
 

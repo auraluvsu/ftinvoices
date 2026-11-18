@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAppData } from '../appData';
 import { BackupModal } from './BackupModal';
+import { RecurringModal } from './RecurringModal';
 
 /** Top-bar dropdown: which client's books are open, plus new client / settings. */
 export function ClientSwitcher() {
   const { client, clients, switchClient, openClientSettings, openCategoryManager } = useAppData();
   const [open, setOpen] = useState(false);
   const [backupOpen, setBackupOpen] = useState(false);
+  const [recurringOpen, setRecurringOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -31,6 +33,7 @@ export function ClientSwitcher() {
     <div className="menu client-switcher" ref={ref}>
       {/* Rendered through a portal, so it isn't inside the menu visually. */}
       {backupOpen && <BackupModal onClose={() => setBackupOpen(false)} />}
+      {recurringOpen && <RecurringModal onClose={() => setRecurringOpen(false)} />}
       <button
         type="button"
         className="client-btn"
@@ -65,6 +68,9 @@ export function ClientSwitcher() {
           </button>
           <button type="button" role="menuitem" onClick={pick(openCategoryManager)}>
             <span>Manage categories</span>
+          </button>
+          <button type="button" role="menuitem" onClick={pick(() => setRecurringOpen(true))}>
+            <span>Recurring expenses…</span>
           </button>
           <div className="menu-sep" />
           <button type="button" role="menuitem" className="danger" onClick={pick(() => openClientSettings('delete'))}>

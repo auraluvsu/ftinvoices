@@ -1,5 +1,6 @@
 import { supabase, supabaseKey, supabaseUrl } from './supabase';
-import type { Category, Client, FiledQuarter, Receipt } from '../types';
+import type { Category, Client, FiledQuarter, Receipt, RecurringExpense } from '../types';
+import { isFrequency } from './recurring';
 import type { QuarterStagger } from './quarters';
 import type { Tables, TablesUpdate } from './database.types';
 import { DEFAULT_VAT_RATE, isVatRate } from './vatRates';
@@ -131,9 +132,13 @@ export async function deleteCategory(id: string): Promise<void> {
 }
 
 /** Moves every receipt in one category to another (same client). */
+/** Moves receipts and recurring expenses from one category to another (before a merge deletes the first). */
 export async function reassignReceipts(clientId: string, fromId: string, toId: string): Promise<void> {
   check(
     await supabase.from('receipts').update({ category_id: toId }).eq('client_id', clientId).eq('category_id', fromId),
+  );
+  check(
+    await supabase.from('recurring_expenses').update({ category_id: toId }).eq('client_id', clientId).eq('category_id', fromId),
   );
 }
 
@@ -259,6 +264,77 @@ export async function fileQuarter(
 
 export async function unfileQuarter(id: string): Promise<void> {
   check(await supabase.from('filed_quarters').delete().eq('id', id));
+}
+
+// ---------- Recurring expenses ----------
+type RecurringRow = Pick<
+  Tables<'recurring_expenses'>,
+  'id' | 'client_id' | 'category_id' | 'name' | 'total' | 'vat' | 'vat_rate' | 'frequency' | 'anchor_day' | 'next_date'
+>;
+const RECURRING_COLUMNS = 'id,client_id,category_id,name,total,vat,vat_rate,frequency,anchor_day,next_date';
+const toRecurring = (r: RecurringRow): RecurringExpense => ({
+  id: r.id,
+  clientId: r.client_id,
+  categoryId: r.category_id,
+  name: r.name,
+  total: Number(r.total),
+  vat: Number(r.vat),
+  vatRate: isVatRate(r.vat_rate) ? r.vat_rate : DEFAULT_VAT_RATE,
+  frequency: isFrequency(r.frequency) ? r.frequency : 'monthly',
+  anchorDay: r.anchor_day,
+  nextDate: r.next_date,
+});
+
+export async function listRecurring(clientId: string): Promise<RecurringExpense[]> {
+  const rows = check(await supabase.from('recurring_expenses').select(RECURRING_COLUMNS).eq('client_id', clientId).order('next_date'));
+  return (rows ?? []).map(toRecurring);
+}
+
+export async function insertRecurring(r: Omit<RecurringExpense, 'id'>): Promise<RecurringExpense> {
+  const row = checkRow(
+    await supabase
+      .from('recurring_expenses')
+      .insert({
+        client_id: r.clientId,
+        category_id: r.categoryId,
+        name: r.name,
+        total: r.total,
+        vat: r.vat,
+        vat_rate: r.vatRate,
+        frequency: r.frequency,
+        anchor_day: r.anchorDay,
+        next_date: r.nextDate,
+      })
+      .select(RECURRING_COLUMNS)
+      .single(),
+  );
+  return toRecurring(row);
+}
+
+/**
+ * Moves a recurring expense on to `nextDate` (optionally with new amounts), but only if it's still
+ * at `expectedNextDate`, so two devices can't both add the same month. Returns null if it wasn't.
+ */
+export async function advanceRecurring(
+  id: string,
+  expectedNextDate: string,
+  nextDate: string,
+  amounts?: { total: number; vat: number },
+): Promise<RecurringExpense | null> {
+  const row = check(
+    await supabase
+      .from('recurring_expenses')
+      .update({ next_date: nextDate, ...amounts })
+      .eq('id', id)
+      .eq('next_date', expectedNextDate)
+      .select(RECURRING_COLUMNS)
+      .maybeSingle(),
+  );
+  return row ? toRecurring(row) : null;
+}
+
+export async function deleteRecurring(id: string): Promise<void> {
+  check(await supabase.from('recurring_expenses').delete().eq('id', id));
 }
 
 // ---------- Images (private bucket) ----------

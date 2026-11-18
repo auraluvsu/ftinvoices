@@ -1,5 +1,6 @@
 import type { QuarterStagger } from './lib/quarters';
 import type { VatRate } from './lib/vatRates';
+import type { Frequency } from './lib/recurring';
 
 export interface Receipt {
   id: string;
@@ -36,6 +37,8 @@ export interface ReceiptDraft {
   date: string;
   /** Unchanged display URL, a new `data:` URL to upload, or undefined for no image */
   image?: string;
+  /** New receipts only: also set it up as a recurring expense. */
+  repeat?: Frequency;
 }
 
 export interface Category {
@@ -64,6 +67,23 @@ export interface FiledQuarter {
   /** Box 4 and Box 7 as filed */
   box4: number;
   box7: number;
+}
+
+/** A regular bill, offered for review each time it's due. */
+export interface RecurringExpense {
+  id: string;
+  clientId: string;
+  /** null if its category was deleted */
+  categoryId: string | null;
+  name: string;
+  total: number;
+  vat: number;
+  vatRate: VatRate;
+  frequency: Frequency;
+  /** Day of the month it falls on (1–31) */
+  anchorDay: number;
+  /** Next occurrence not yet added or skipped, YYYY-MM-DD */
+  nextDate: string;
 }
 
 /** A category created while saving a receipt. */

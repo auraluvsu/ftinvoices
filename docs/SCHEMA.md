@@ -72,6 +72,19 @@ VAT quarters that have been filed with HMRC. Receipts dated inside one are locke
 | `filed_at` | timestamptz | When it was marked as filed |
 | `box4`, `box7` | numeric | The Box 4 (VAT reclaimed) and Box 7 (net purchases, whole pounds) figures at the time of filing |
 
+### `recurring_expenses`
+Regular bills (subscriptions, phone, rent). When one is due, the app offers it for review; nothing is added on its own.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id`, `user_id`, `client_id` | uuid | As for receipts; deleted with the client |
+| `category_id` | uuid | A category of the same client. Set to null if that category is deleted (shown as Other) |
+| `name`, `total`, `vat`, `vat_rate` | | Copied onto each receipt it creates; same checks as `receipts` |
+| `frequency` | text | `monthly`, `quarterly` or `yearly` |
+| `anchor_day` | smallint | Day of the month it falls on (1–31). Short months use their last day, so a bill on the 31st stays on month ends |
+| `next_date` | date | The next occurrence not yet added or skipped |
+| `created_at` | timestamptz | Set on insert |
+
 ## Rules the database enforces
 
 - **Category belongs to the same client.** The foreign key `(category_id, client_id) → categories(id, client_id)` means a receipt can't point at another client's category.
@@ -94,7 +107,7 @@ VAT quarters that have been filed with HMRC. Receipts dated inside one are locke
 RLS is enabled on every table, so every query only sees rows owned by the signed-in user:
 
 - `clients`: `user_id = auth.uid()` for reading and writing.
-- `categories`, `receipts` and `filed_quarters`: `user_id = auth.uid()`, and on insert/update the `client_id` must be one of the user's own clients.
+- `categories`, `receipts`, `filed_quarters` and `recurring_expenses`: `user_id = auth.uid()`, and on insert/update the `client_id` must be one of the user's own clients.
 
 Signed-out requests (publishable key with no session) see nothing.
 

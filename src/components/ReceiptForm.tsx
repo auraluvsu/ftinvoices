@@ -10,6 +10,7 @@ import { scanReceipt } from '../lib/db';
 import { mergeScan } from '../lib/scan';
 import { ImageInput } from './ImageInput';
 import { LockIcon } from './LockIcon';
+import { FREQUENCIES, type Frequency } from '../lib/recurring';
 import { CategoryColorPicker } from './CategoryColorPicker';
 import { ScanUnavailableError } from '../lib/db';
 import { markScanUnavailable, scanAvailable } from '../lib/scanAvailability';
@@ -30,6 +31,8 @@ interface Draft {
   total: string;
   vat: string;
   vatRate: VatRate;
+  /** New receipts only: '' for a one-off. */
+  repeat: Frequency | '';
   category: string;
   newCategory: string;
   newColor: string;
@@ -42,6 +45,7 @@ const blank = (category = ''): Draft => ({
   total: '',
   vat: '',
   vatRate: DEFAULT_VAT_RATE,
+  repeat: '',
   category,
   newCategory: '',
   newColor: '',
@@ -54,6 +58,7 @@ const fromReceipt = (r: Receipt): Draft => ({
   total: r.total.toFixed(2),
   vat: r.vat.toFixed(2),
   vatRate: r.vatRate,
+  repeat: '',
   category: r.category,
   newCategory: '',
   newColor: '',
@@ -200,6 +205,7 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
       total: round2(total),
       vat: round2(vat),
       vatRate: draft.vatRate,
+      repeat: editing ? undefined : draft.repeat || undefined,
       category: finalCategory,
       date: draft.date,
       image: draft.image,
@@ -317,21 +323,41 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
           </Field>
         </div>
 
-        <Field label="VAT rate">
-          <select
-            value={draft.vatRate}
-            onChange={(e) => {
-              changeRate(e.target.value as VatRate);
-              setRateTouched(true);
-            }}
-          >
-            {VAT_RATES.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.label}
-              </option>
-            ))}
-          </select>
-        </Field>
+        <div className={editing ? undefined : 'row-2'}>
+          <Field label="VAT rate">
+            <select
+              value={draft.vatRate}
+              onChange={(e) => {
+                changeRate(e.target.value as VatRate);
+                setRateTouched(true);
+              }}
+            >
+              {VAT_RATES.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          {!editing && (
+            <Field label="Repeats">
+              <select value={draft.repeat} onChange={(e) => set('repeat', e.target.value as Frequency | '')}>
+                <option value="">Doesn’t repeat</option>
+                {FREQUENCIES.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+        </div>
+        {draft.repeat && (
+          <span className="field-hint">
+            You’ll be asked to add it again {draft.repeat === 'monthly' ? 'each month' : draft.repeat === 'quarterly' ? 'every 3 months' : 'each year'}, so
+            you can check the amount first.
+          </span>
+        )}
 
         <div className="row-2">
           <Field label="Category" error={errors.category} highlight={scanned.has('category')}>

@@ -4,6 +4,7 @@ import { ExportMenu } from './components/ExportMenu';
 import { ThemeToggle } from './components/ThemeToggle';
 import { AccountMenu } from './components/AccountMenu';
 import { ClientSwitcher } from './components/ClientSwitcher';
+import { RecurringDueBanner } from './components/RecurringDueBanner';
 
 const NAV = [
   { to: '/', label: 'Overview' },
@@ -45,6 +46,7 @@ export function Layout() {
         </div>
       </header>
 
+      <RecurringDueBanner />
       <Outlet />
       <ScrollRestoration />
     </div>

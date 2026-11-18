@@ -22,6 +22,7 @@ Built with React + TypeScript (Vite), with data stored in Supabase behind Google
 
 **Clients**
 - A separate set of books per client, switched from the top bar.
+- **Recurring expenses**: set a new receipt to repeat monthly, every 3 months or yearly. When one is due, a banner offers it for review with the amounts prefilled (untick to skip a month, or change the price for this and later months); nothing is added without you confirming. Manage them under *Recurring expenses…* in the client menu.
 - **Backup and restore** (client menu): one JSON file per client with receipts, photos, categories and settings; restore as a new client or into the open one without duplicates.
 - Client settings: name, VAT number and VAT quarter stagger (calendar quarters, or quarters ending Apr/Jul/Oct/Jan or May/Aug/Nov/Feb).
 - Delete a client (with its receipts and photos) from the client menu, after downloading a backup and typing its name.
