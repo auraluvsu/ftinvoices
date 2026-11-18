@@ -58,6 +58,8 @@ The app needs a Supabase project first. See [docs/NEXT-STEPS.md](docs/NEXT-STEPS
 | `npm test` | Run the unit tests once (Vitest) |
 | `npm run test:watch` | Re-run tests as files change |
 
+Every push and pull request runs lint, build and tests in GitHub Actions (`.github/workflows/ci.yml`). A second workflow reports lines of TypeScript in the run summary.
+
 ## Project layout
 
 ```
