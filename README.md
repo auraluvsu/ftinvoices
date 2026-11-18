@@ -55,6 +55,8 @@ The app needs a Supabase project first. See [docs/NEXT-STEPS.md](docs/NEXT-STEPS
 | `npm run preview` | Serve the production build locally |
 | `npm run lint` | Lint with oxlint |
 
+Every push and pull request runs lint, build and tests in GitHub Actions (`.github/workflows/ci.yml`). A second workflow reports lines of TypeScript in the run summary.
+
 ## Project layout
 
 ```
