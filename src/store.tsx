@@ -8,6 +8,7 @@ import { dataUrlToBlob } from './lib/image';
 import * as db from './lib/db';
 import { BootScreen } from './components/BootScreen';
 import { ClientSettingsModal } from './components/ClientSettingsModal';
+import { DeleteClientModal } from './components/DeleteClientModal';
 import { ManageCategoriesModal } from './components/ManageCategoriesModal';
 
 type Phase = { kind: 'loading' } | { kind: 'error'; message: string } | { kind: 'no-client' } | { kind: 'ready' };
@@ -43,7 +44,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const [phase, setPhase] = useState<Phase>({ kind: 'loading' });
   const [clients, setClients] = useState<Client[]>([]);
   const [clientId, setClientId] = useState<string | null>(null);
-  const [settings, setSettings] = useState<'edit' | 'new' | null>(null);
+  const [settings, setSettings] = useState<'edit' | 'new' | 'delete' | null>(null);
   const [managingCategories, setManagingCategories] = useState(false);
   const client = clients.find((c) => c.id === clientId) ?? null;
   const [categoryList, setCategoryList] = useState<Category[]>([]);
@@ -387,7 +388,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       {/* Remount pages on client switch so per-page state (open months, filters, edits) resets. */}
       <Fragment key={value.client.id}>{children}</Fragment>
       {managingCategories && <ManageCategoriesModal onClose={() => setManagingCategories(false)} />}
-      {settings && (
+      {(settings === 'edit' || settings === 'new') && (
         <ClientSettingsModal
           client={settings === 'edit' ? value.client : null}
           onClose={() => setSettings(null)}
@@ -411,6 +412,28 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
               return true;
             } catch (e) {
               notify(`Couldn’t save client: ${errMsg(e)}`, 'error');
+              return false;
+            }
+          }}
+        />
+      )}
+      {settings === 'delete' && (
+        <DeleteClientModal
+          client={value.client}
+          receiptCount={stored.length}
+          photoCount={stored.filter((r) => r.imagePath).length}
+          onClose={() => setSettings(null)}
+          onBackup={() => value.exportList(value.receipts, 'json', 'backup')}
+          onDelete={async () => {
+            const name = value.client.name;
+            try {
+              await db.deleteClient(userId, value.client.id);
+              setSettings(null);
+              notify(`Deleted “${name}”`);
+              await reload();
+              return true;
+            } catch (e) {
+              notify(`Couldn’t delete client: ${errMsg(e)}`, 'error');
               return false;
             }
           }}

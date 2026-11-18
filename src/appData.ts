@@ -16,7 +16,8 @@ export interface AppData {
   clients: Client[];
   switchClient: (id: string) => void;
   /** Opens the client settings popup (for the open client, or a new one). */
-  openClientSettings: (mode?: 'edit' | 'new') => void;
+  /** 'delete' opens the delete-client confirmation. */
+  openClientSettings: (mode?: 'edit' | 'new' | 'delete') => void;
   receipts: Receipt[];
   /** Category names for the open client, sorted with "Other" last. */
   categories: string[];

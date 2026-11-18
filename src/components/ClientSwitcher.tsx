@@ -59,6 +59,10 @@ export function ClientSwitcher() {
           <button type="button" role="menuitem" onClick={pick(openCategoryManager)}>
             <span>Manage categories</span>
           </button>
+          <div className="menu-sep" />
+          <button type="button" role="menuitem" className="danger" onClick={pick(() => openClientSettings('delete'))}>
+            <span>Delete client…</span>
+          </button>
         </div>
       )}
     </div>
