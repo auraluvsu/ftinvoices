@@ -348,6 +348,13 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         <ClientSettingsModal
           client={settings === 'edit' ? value.client : null}
           onClose={() => setSettings(null)}
+          onFindUnusedImages={async () => {
+            const used = new Set(stored.flatMap((r) => (r.imagePath ? [r.imagePath] : [])));
+            const all = await db.listImages(`${userId}/${value.client.id}`);
+            // Images waiting out an Undo window aren't "unused" yet.
+            return all.filter((p) => !used.has(p) && !pendingDeletes.has(p));
+          }}
+          onRemoveImages={(paths) => db.removeImages(paths)}
           onSave={async (c) => {
             try {
               if (settings === 'edit') {

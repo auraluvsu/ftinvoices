@@ -8,14 +8,45 @@ interface Props {
   client: Client | null;
   onSave: (c: Omit<Client, 'id'>) => Promise<boolean>;
   onClose: () => void;
+  /** Editing only: finds stored photos not attached to any receipt. */
+  onFindUnusedImages?: () => Promise<string[]>;
+  onRemoveImages?: (paths: string[]) => Promise<void>;
 }
 
-export function ClientSettingsModal({ client, onSave, onClose }: Props) {
+type Tidy =
+  | { kind: 'idle' }
+  | { kind: 'busy'; label: string }
+  | { kind: 'found'; paths: string[] }
+  | { kind: 'done'; message: string };
+
+export function ClientSettingsModal({ client, onSave, onClose, onFindUnusedImages, onRemoveImages }: Props) {
   const [name, setName] = useState(client?.name ?? '');
   const [vatNumber, setVatNumber] = useState(client?.vatNumber ?? '');
   const [stagger, setStagger] = useState<QuarterStagger>(client?.stagger ?? 0);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [tidy, setTidy] = useState<Tidy>({ kind: 'idle' });
+
+  const findUnused = async () => {
+    if (!onFindUnusedImages) return;
+    setTidy({ kind: 'busy', label: 'Checking…' });
+    try {
+      const paths = await onFindUnusedImages();
+      setTidy(paths.length ? { kind: 'found', paths } : { kind: 'done', message: 'No unused photos.' });
+    } catch (e) {
+      setTidy({ kind: 'done', message: `Couldn’t check: ${e instanceof Error ? e.message : String(e)}` });
+    }
+  };
+  const removeUnused = async (paths: string[]) => {
+    if (!onRemoveImages) return;
+    setTidy({ kind: 'busy', label: 'Deleting…' });
+    try {
+      await onRemoveImages(paths);
+      setTidy({ kind: 'done', message: `Deleted ${paths.length} unused photo${paths.length === 1 ? '' : 's'}.` });
+    } catch (e) {
+      setTidy({ kind: 'done', message: `Couldn’t delete: ${e instanceof Error ? e.message : String(e)}` });
+    }
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,6 +96,31 @@ export function ClientSettingsModal({ client, onSave, onClose }: Props) {
             ))}
           </select>
         </label>
+
+        {client && onFindUnusedImages && (
+          <div className="field tidy-photos">
+            <span className="field-label">Photos</span>
+            {tidy.kind === 'found' ? (
+              <div className="tidy-row">
+                <span className="field-hint">
+                  <strong>{tidy.paths.length}</strong> photo{tidy.paths.length === 1 ? ' isn’t' : 's aren’t'} attached to any receipt.
+                </span>
+                <button type="button" className="btn btn-secondary danger" onClick={() => removeUnused(tidy.paths)}>
+                  Delete {tidy.paths.length === 1 ? 'it' : 'them'}
+                </button>
+              </div>
+            ) : (
+              <div className="tidy-row">
+                <span className="field-hint" role="status">
+                  {tidy.kind === 'done' ? tidy.message : 'Find photos left behind by deleted or replaced receipts.'}
+                </span>
+                <button type="button" className="btn btn-secondary" onClick={findUnused} disabled={tidy.kind === 'busy'}>
+                  {tidy.kind === 'busy' ? tidy.label : 'Check for unused photos'}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="form-actions">
           <button type="button" className="btn btn-secondary" onClick={onClose}>
