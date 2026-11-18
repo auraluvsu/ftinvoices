@@ -37,6 +37,10 @@ export interface AppData {
   /** Adds or updates a receipt (uploading any new image). Resolves false if it couldn't be saved. */
   saveReceipt: (draft: ReceiptDraft, newCategory?: NewCategory) => Promise<boolean>;
   deleteReceipt: (receipt: Receipt) => void;
+  /** Deletes several receipts, with one Undo for all of them. */
+  deleteReceipts: (receipts: Receipt[]) => void;
+  /** Moves receipts to another category. Resolves false if it couldn't be saved. */
+  moveReceipts: (receipts: Receipt[], category: string) => Promise<boolean>;
   exportList: (list: Receipt[], format: ExportFormat, label?: string) => Promise<void>;
   notify: (msg: string, kind?: Toast['kind'], undo?: () => void) => void;
 }

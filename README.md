@@ -17,6 +17,7 @@ Built with React + TypeScript (Vite), with data stored in Supabase behind Google
 **Organising**
 - Receipts grouped by year and month, with sort (date, price, VAT, name) and filters (price, VAT, date, category) per month.
 - **Search** across all receipts by name, category or amount (`fuel 49`, `£240`).
+- **Select** several receipts (or all search results) to move them to a category, export them or delete them in one go, with a single Undo.
 - **Colour-coded categories**, each with its own colour. Manage them from the popup: rename, recolour with swatches or a colour wheel, merge, delete unused, add new.
 
 **Clients**

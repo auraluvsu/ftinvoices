@@ -362,6 +362,50 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         );
       },
 
+      deleteReceipts: (list) => {
+        const ids = new Set(list.map((r) => r.id));
+        const rows = stored.filter((r) => ids.has(r.id));
+        if (!rows.length) return;
+        setStored((prev) => prev.filter((r) => !ids.has(r.id)));
+        db.deleteReceipts([...ids]).then(
+          () => {
+            const paths = rows.flatMap((r) => (r.imagePath ? [r.imagePath] : []));
+            const timer = paths.length
+              ? setTimeout(() => db.removeImages(paths).catch(console.error), IMAGE_DELETE_DELAY_MS)
+              : undefined;
+            notify(`Deleted ${rows.length} receipt${rows.length === 1 ? '' : 's'}`, 'info', async () => {
+              clearTimeout(timer);
+              setToast(null);
+              try {
+                const restored = await db.restoreReceipts(rows);
+                setStored((prev) => [...prev.filter((r) => !ids.has(r.id)), ...restored]);
+              } catch (e) {
+                notify(`Couldn’t restore: ${errMsg(e)}`, 'error');
+              }
+            });
+          },
+          (e) => {
+            setStored((prev) => [...prev.filter((r) => !ids.has(r.id)), ...rows]);
+            notify(`Couldn’t delete: ${errMsg(e)}`, 'error');
+          },
+        );
+      },
+
+      moveReceipts: async (list, categoryName) => {
+        const category = categoryList.find((c) => c.name === categoryName);
+        if (!category) return false;
+        try {
+          const updated = await db.setReceiptsCategory(client.id, list.map((r) => r.id), category.id);
+          const byId = new Map(updated.map((r) => [r.id, r]));
+          setStored((prev) => prev.map((r) => byId.get(r.id) ?? r));
+          notify(`Moved ${updated.length} receipt${updated.length === 1 ? '' : 's'} to “${category.name}”`);
+          return true;
+        } catch (e) {
+          notify(`Couldn’t move receipts: ${errMsg(e)}`, 'error');
+          return false;
+        }
+      },
+
       exportList: async (list, format, label) => {
         try {
           await exportReceipts(list, format, label, { client: client.name, vatNumber: client.vatNumber });
