@@ -12,6 +12,8 @@ const router = createBrowserRouter([
       { index: true, lazy: async () => ({ Component: (await import('./pages/HomePage')).HomePage }) },
       { path: 'receipts', lazy: async () => ({ Component: (await import('./pages/ReceiptsPage')).ReceiptsPage }) },
       { path: '*', element: <Navigate to="/" replace /> },
+      // Printable report for a date range (see ReportPage); loaded on demand.
+      { path: 'report', lazy: async () => ({ Component: (await import('./pages/ReportPage')).ReportPage }) },
     ],
   },
 ]);
