@@ -39,6 +39,12 @@ export interface ScanResponse {
 export type CreateMessage = (params: Record<string, unknown>) => Promise<ScanResponse>;
 
 export interface Deps {
+  /**
+   * Checks the request's `Authorization: Bearer <token>` header and resolves true for a
+   * signed-in user. Done here rather than by the gateway's legacy JWT check, which can
+   * reject valid tokens on projects using the newer signing keys.
+   */
+  authenticate: (req: Request) => Promise<boolean>;
   /** The Anthropic API key, or undefined if the secret isn't set. */
   apiKey: () => string | undefined;
   /** Builds a message sender for the given key. */
@@ -104,6 +110,14 @@ export function createHandler(deps: Deps) {
   return async (req: Request): Promise<Response> => {
     if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
     if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
+
+    let signedIn = false;
+    try {
+      signedIn = await deps.authenticate(req);
+    } catch (e) {
+      (deps.log ?? console.error)(e);
+    }
+    if (!signedIn) return json({ error: 'Sign in to scan receipts' }, 401);
 
     let image: unknown, categories: unknown;
     try {

@@ -8,15 +8,20 @@ const reply = (body: unknown, stop_reason = 'end_turn'): ScanResponse => ({
   content: [{ type: 'text', text: typeof body === 'string' ? body : JSON.stringify(body) }],
 });
 
-function setup(opts: { apiKey?: string | undefined; send?: CreateMessage } = {}) {
+function setup(opts: { apiKey?: string | undefined; send?: CreateMessage; signedIn?: boolean | Error } = {}) {
   const send = vi.fn<CreateMessage>(opts.send ?? (async () => reply({ name: 'Shell', total: 60, vat: 10, date: '2026-11-02', category: 'Fuel' })));
   const log = vi.fn();
+  const authenticate = vi.fn(async () => {
+    if (opts.signedIn instanceof Error) throw opts.signedIn;
+    return opts.signedIn ?? true;
+  });
   const handler = createHandler({
+    authenticate,
     apiKey: () => ('apiKey' in opts ? opts.apiKey : 'sk-ant-test'),
     createMessage: () => send,
     log,
   });
-  return { handler, send, log };
+  return { handler, send, log, authenticate };
 }
 
 const post = (body: unknown) =>
