@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Category, Client, Receipt } from './types';
-import { AppDataContext as Ctx, type AppData, type Toast } from './appData';
+import { AppDataContext as Ctx, type AppData } from './appData';
 import { useAuth } from './authContext';
 import { exportReceipts } from './lib/export';
 import { fallbackColor } from './lib/color';
@@ -10,6 +10,8 @@ import { BootScreen } from './components/BootScreen';
 import { ClientSettingsModal } from './components/ClientSettingsModal';
 import { DeleteClientModal } from './components/DeleteClientModal';
 import { ManageCategoriesModal } from './components/ManageCategoriesModal';
+import { ToastView } from './components/ToastView';
+import { useToasts } from './data/useToasts';
 
 type Phase = { kind: 'loading' } | { kind: 'error'; message: string } | { kind: 'no-client' } | { kind: 'ready' };
 
@@ -52,19 +54,13 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   /** Images of deleted receipts waiting out the Undo window: path → timer (one mutable Map for the provider's life). */
   const [pendingDeletes] = useState(() => new Map<string, ReturnType<typeof setTimeout>>());
   const [urls, setUrls] = useState<Map<string, string>>(() => new Map());
-  const [toast, setToast] = useState<Toast | null>(null);
+  const { toast, notify, dismiss: dismissToast } = useToasts();
   const storedRef = useRef(stored);
   /** When image links were last signed (ms); used to spot links that may have expired. */
   const signedAtRef = useRef(0);
   useEffect(() => {
     storedRef.current = stored;
   }, [stored]);
-
-  const notify = useCallback((msg: string, kind: Toast['kind'] = 'info', undo?: () => void) => {
-    const id = Date.now();
-    setToast({ id, msg, kind, undo });
-    setTimeout(() => setToast((t) => (t?.id === id ? null : t)), undo ? 6000 : 4000);
-  }, []);
 
   /** Fetches everything, then applies it in one go (state is only set after the network calls). */
   // silent: refresh in place, keeping the current screen if it fails.
@@ -346,7 +342,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
             if (row.imagePath) scheduleImageDelete(row.imagePath);
             notify(`Deleted “${row.name}”`, 'info', async () => {
               if (row.imagePath) cancelImageDelete(row.imagePath);
-              setToast(null);
+              dismissToast();
               try {
                 const restored = await db.upsertReceipt(row);
                 setStored((prev) => (prev.some((r) => r.id === restored.id) ? prev : [...prev, restored]));
@@ -375,7 +371,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
               : undefined;
             notify(`Deleted ${rows.length} receipt${rows.length === 1 ? '' : 's'}`, 'info', async () => {
               clearTimeout(timer);
-              setToast(null);
+              dismissToast();
               try {
                 const restored = await db.restoreReceipts(rows);
                 setStored((prev) => [...prev.filter((r) => !ids.has(r.id)), ...restored]);
@@ -416,7 +412,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       },
       notify,
     };
-  }, [client, clients, reload, stored, receipts, categories, categoryList, categoryColor, userId, notify, scheduleImageDelete, cancelImageDelete]);
+  }, [client, clients, reload, stored, receipts, categories, categoryList, categoryColor, userId, notify, dismissToast, scheduleImageDelete, cancelImageDelete]);
 
   if (phase.kind !== 'ready' || !value) {
     return (
@@ -484,16 +480,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
           }}
         />
       )}
-      {toast && (
-        <div className={`toast ${toast.kind}`} role={toast.kind === 'error' ? 'alert' : 'status'}>
-          <span>{toast.msg}</span>
-          {toast.undo && (
-            <button type="button" className="link-btn" onClick={toast.undo}>
-              Undo
-            </button>
-          )}
-        </div>
-      )}
+      <ToastView toast={toast} />
     </Ctx.Provider>
   );
 }
