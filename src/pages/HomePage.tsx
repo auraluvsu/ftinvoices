@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import type { Receipt } from '../types';
 import { useAppData } from '../appData';
-import { formatDate, formatMoney, todayIso } from '../lib/format';
+import { daysBetween, formatDate, formatMoney, todayIso } from '../lib/format';
 import { sumTotals } from '../lib/receipts';
 import { categoryBreakdown, quarterEndExclusive, recentQuarters, type CategoryTotal } from '../lib/quarters';
 import { QuarterChart } from '../components/QuarterChart';
@@ -33,7 +33,7 @@ export function HomePage() {
   const qt = sumTotals(current.receipts);
   const prevTotal = sumTotals(previous.receipts).total;
   const change = prevTotal ? ((qt.total - prevTotal) / prevTotal) * 100 : null;
-  const daysLeft = Math.ceil((quarterEndExclusive(current.start).getTime() - new Date(today + 'T00:00:00').getTime()) / 86_400_000);
+  const daysLeft = daysBetween(new Date(today + 'T00:00:00'), quarterEndExclusive(current.start));
 
   const ytd = useMemo(() => sumTotals(receipts.filter((r) => r.date.startsWith(year))), [receipts, year]);
 
