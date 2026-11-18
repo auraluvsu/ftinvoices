@@ -23,6 +23,7 @@ Built with React + TypeScript (Vite), with data stored in Supabase behind Google
 - Client settings: name, VAT number and VAT quarter stagger (calendar quarters, or quarters ending Apr/Jul/Oct/Jan or May/Aug/Nov/Feb).
 
 **Overview and reports**
+- UK tax year (6 April – 5 April) totals on the Overview, alongside the calendar year, and an Export period menu for the quarter, year, tax year or all time.
 - Overview page: spend and VAT this quarter and this year, a spend-per-quarter chart, spend by category, and biggest bills.
 - Quarterly review: totals per VAT quarter, change on the previous quarter, month-by-month and category breakdowns, and the VAT return's **Box 4** and **Box 7** with copy buttons.
 - Export everything, a month, a filtered view or a quarter as **.xlsx** (summary sheet + per-month sheets), **CSV**, or **JSON** (includes images). Exports carry the client's name and VAT number.

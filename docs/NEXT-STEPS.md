@@ -56,7 +56,6 @@ These came up while planning and haven't been built yet.
 **VAT returns**
 - Mark a quarter as filed and lock its receipts.
 - VAT rate per receipt (20% / 5% / 0% / exempt, or "supplier not VAT registered").
-- UK tax year (6 April – 5 April) totals alongside calendar years.
 
 **Data and backup**
 - One-click backup and restore of a client's books.
