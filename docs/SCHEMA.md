@@ -55,7 +55,7 @@ Per-client categories, each with a display colour.
 | `date` | date | Receipt date |
 | `image_path` | text | Path of the photo in the storage bucket, or null |
 | `created_at` | timestamptz | Set on insert; used to break ties when sorting |
-| `updated_at` | timestamptz | Updated automatically by a trigger |
+| `updated_at` | timestamptz | Updated automatically by a trigger. Edits only apply if it still matches the value the app loaded, so an old copy on another device can't silently overwrite a newer edit |
 
 Index: `(client_id, date desc)` for loading a client's receipts newest first.
 
