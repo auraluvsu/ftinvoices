@@ -13,6 +13,7 @@ import { ManageCategoriesModal } from './components/ManageCategoriesModal';
 type Phase = { kind: 'loading' } | { kind: 'error'; message: string } | { kind: 'no-client' } | { kind: 'ready' };
 
 const RESIGN_EVERY_MS = 6 * 60 * 60 * 1000; // well inside the 12h signed-URL lifetime
+const REFRESH_MIN_GAP_MS = 60_000;
 const IMAGE_DELETE_DELAY_MS = 8000; // keep the image until the Undo toast is gone
 
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -65,7 +66,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   /** Fetches everything, then applies it in one go (state is only set after the network calls). */
-  const fetchBooks = useCallback(async (preferredId?: string) => {
+  // silent: refresh in place, keeping the current screen if it fails.
+  const fetchBooks = useCallback(async (preferredId?: string, { silent = false } = {}) => {
     try {
       const all = await db.listClients();
       if (!all.length) return setPhase({ kind: 'no-client' });
@@ -81,17 +83,32 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       setUrls(signed);
       setPhase({ kind: 'ready' });
     } catch (e) {
-      setPhase({ kind: 'error', message: errMsg(e) });
+      if (silent) console.error(e);
+      else setPhase({ kind: 'error', message: errMsg(e) });
     }
   }, []);
 
   const reload = useCallback(
-    (preferredId?: string) => {
-      setPhase({ kind: 'loading' });
-      return fetchBooks(preferredId);
+    (preferredId?: string, opts: { silent?: boolean } = {}) => {
+      if (!opts.silent) setPhase({ kind: 'loading' });
+      return fetchBooks(preferredId, opts);
     },
     [fetchBooks],
   );
+
+  // Coming back to the tab: pick up changes made on other devices (at most once a minute).
+  useEffect(() => {
+    if (phase.kind !== 'ready') return;
+    let last = Date.now();
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible' || Date.now() - last < REFRESH_MIN_GAP_MS) return;
+      last = Date.now();
+      // Stay on this tab's client even if another tab switched (the choice is shared via localStorage).
+      void reload(clientId ?? undefined, { silent: true });
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [phase.kind, reload, clientId]);
 
   const createClient = useCallback(
     async (c: Omit<Client, 'id'>) => {
@@ -278,8 +295,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
             imagePath = undefined;
           }
 
-          // 3. Row
-          const saved = await db.upsertReceipt({
+          // 3. Row. Edits only apply if nobody changed the receipt elsewhere meanwhile.
+          const row: db.StoredReceipt = {
             id: draft.id,
             clientId: client.id,
             categoryId: category.id,
@@ -289,7 +306,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
             date: draft.date,
             imagePath,
             createdAt: existing?.createdAt ?? Date.now(),
-          });
+          };
+          const saved = existing?.updatedAt ? await db.updateReceipt(row, existing.updatedAt) : await db.upsertReceipt(row);
 
           // Show the freshly uploaded image straight from memory; no need to sign it yet.
           if (isNewImage && imagePath) {
@@ -306,6 +324,12 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
           return true;
         } catch (e) {
           if (uploadedPath) db.removeImages([uploadedPath]).catch(console.error);
+          if (e instanceof db.ReceiptConflictError) {
+            // Load the newer version; the form stays open, so saving again overwrites it on purpose.
+            void reload(client.id, { silent: true });
+            notify(`${e.message}. The latest version is loaded — save again to replace it.`, 'error');
+            return false;
+          }
           notify(`Couldn’t save: ${errMsg(e)}`, 'error');
           return false;
         }
