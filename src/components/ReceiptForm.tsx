@@ -5,10 +5,11 @@ import { newId, round2, todayIso } from '../lib/format';
 import { catVar, SUGGESTED_COLORS } from '../lib/color';
 import { supplierMemory } from '../lib/receipts';
 import { urlToDataUrl } from '../lib/image';
-import { scanReceipt, ScanUnavailableError } from '../lib/db';
-import { markScanUnavailable, scanAvailable } from '../lib/scanAvailability';
+import { scanReceipt } from '../lib/db';
 import { ImageInput } from './ImageInput';
 import { CategoryColorPicker } from './CategoryColorPicker';
+import { ScanUnavailableError } from '../lib/db';
+import { markScanUnavailable, scanAvailable } from '../lib/scanAvailability';
 
 const NEW_CATEGORY = '__new__';
 const UK_VAT_RATE = 0.2;
