@@ -1,5 +1,5 @@
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
-import type { Category, Client, Receipt } from './types';
+import { Fragment, useCallback, useMemo, useState } from 'react';
+import type { Client, Receipt } from './types';
 import { AppDataContext as Ctx, type AppData } from './appData';
 import { useAuth } from './authContext';
 import { exportReceipts } from './lib/export';
@@ -12,93 +12,25 @@ import { DeleteClientModal } from './components/DeleteClientModal';
 import { ManageCategoriesModal } from './components/ManageCategoriesModal';
 import { ToastView } from './components/ToastView';
 import { useToasts } from './data/useToasts';
+import { useBooks } from './data/useBooks';
 import { useReceiptImages, useResignImages } from './data/useReceiptImages';
 
-type Phase = { kind: 'loading' } | { kind: 'error'; message: string } | { kind: 'no-client' } | { kind: 'ready' };
-
-const REFRESH_MIN_GAP_MS = 60_000;
 const IMAGE_DELETE_DELAY_MS = 8000; // matches useReceiptImages; bulk delete keeps its own timer
 
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
-
-// Which client was last open on this device (a convenience only).
-const CLIENT_KEY = 'ftinvoices.clientId';
-const readClientId = () => {
-  try {
-    return localStorage.getItem(CLIENT_KEY);
-  } catch {
-    return null;
-  }
-};
-const saveClientId = (id: string) => {
-  try {
-    localStorage.setItem(CLIENT_KEY, id);
-  } catch {
-    /* non-essential */
-  }
-};
 
 /** Owns all data for the signed-in user (loaded from Supabase) and app-wide toasts. */
 export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const { session } = useAuth();
   const userId = session.user.id;
 
-  const [phase, setPhase] = useState<Phase>({ kind: 'loading' });
-  const [clients, setClients] = useState<Client[]>([]);
-  const [clientId, setClientId] = useState<string | null>(null);
   const [settings, setSettings] = useState<'edit' | 'new' | 'delete' | null>(null);
   const [managingCategories, setManagingCategories] = useState(false);
-  const client = clients.find((c) => c.id === clientId) ?? null;
-  const [categoryList, setCategoryList] = useState<Category[]>([]);
-  const [stored, setStored] = useState<db.StoredReceipt[]>([]);
   const { urls, replaceUrls, mergeUrls, showLocal, scheduleImageDelete, cancelImageDelete, isPendingDelete } =
     useReceiptImages(session.access_token);
   const { toast, notify, dismiss: dismissToast } = useToasts();
-
-  /** Fetches everything, then applies it in one go (state is only set after the network calls). */
-  // silent: refresh in place, keeping the current screen if it fails.
-  const fetchBooks = useCallback(async (preferredId?: string, { silent = false } = {}) => {
-    try {
-      const all = await db.listClients();
-      if (!all.length) return setPhase({ kind: 'no-client' });
-      const want = preferredId ?? readClientId();
-      const c = all.find((x) => x.id === want) ?? all[0];
-      const [cats, recs] = await Promise.all([db.listCategories(c.id), db.listReceipts(c.id)]);
-      const signed = await db.signImages(recs.flatMap((r) => (r.imagePath ? [r.imagePath] : [])));
-      saveClientId(c.id);
-      setClients(all);
-      setClientId(c.id);
-      setCategoryList(cats);
-      setStored(recs);
-      replaceUrls(signed);
-      setPhase({ kind: 'ready' });
-    } catch (e) {
-      if (silent) console.error(e);
-      else setPhase({ kind: 'error', message: errMsg(e) });
-    }
-  }, [replaceUrls]);
-
-  const reload = useCallback(
-    (preferredId?: string, opts: { silent?: boolean } = {}) => {
-      if (!opts.silent) setPhase({ kind: 'loading' });
-      return fetchBooks(preferredId, opts);
-    },
-    [fetchBooks],
-  );
-
-  // Coming back to the tab: pick up changes made on other devices (at most once a minute).
-  useEffect(() => {
-    if (phase.kind !== 'ready') return;
-    let last = Date.now();
-    const onVisible = () => {
-      if (document.visibilityState !== 'visible' || Date.now() - last < REFRESH_MIN_GAP_MS) return;
-      last = Date.now();
-      // Stay on this tab's client even if another tab switched (the choice is shared via localStorage).
-      void reload(clientId ?? undefined, { silent: true });
-    };
-    document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
-  }, [phase.kind, reload, clientId]);
+  const { phase, clients, setClients, client, categoryList, setCategoryList, stored, setStored, reload } =
+    useBooks(replaceUrls);
 
   const createClient = useCallback(
     async (c: Omit<Client, 'id'>) => {
@@ -113,14 +45,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       await db.updateClient(id, patch);
       setClients((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
     },
-    [],
+    [setClients],
   );
-
-  useEffect(() => {
-    // Initial load from Supabase; state is only set after the awaited network calls.
-    // oxlint-disable-next-line react/set-state-in-effect
-    void fetchBooks();
-  }, [fetchBooks]);
 
   const imagePaths = useMemo(() => stored.flatMap((r) => (r.imagePath ? [r.imagePath] : [])), [stored]);
   useResignImages(imagePaths, phase.kind === 'ready', mergeUrls);
@@ -352,7 +278,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       },
       notify,
     };
-  }, [client, clients, reload, stored, receipts, categories, categoryList, categoryColor, userId, notify, dismissToast, scheduleImageDelete, cancelImageDelete, showLocal]);
+  }, [client, clients, reload, stored, receipts, categories, categoryList, categoryColor, userId, notify, dismissToast, setStored, setCategoryList, scheduleImageDelete, cancelImageDelete, showLocal]);
 
   if (phase.kind !== 'ready' || !value) {
     return (
