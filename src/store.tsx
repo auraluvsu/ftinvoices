@@ -1,115 +1,35 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Category, Client, Receipt } from './types';
-import { AppDataContext as Ctx, type AppData, type Toast } from './appData';
+import { Fragment, useCallback, useMemo, useState } from 'react';
+import type { Client, Receipt } from './types';
+import { AppDataContext as Ctx, type AppData } from './appData';
 import { useAuth } from './authContext';
 import { exportReceipts } from './lib/export';
 import { fallbackColor } from './lib/color';
-import { dataUrlToBlob } from './lib/image';
 import * as db from './lib/db';
 import { BootScreen } from './components/BootScreen';
 import { ClientSettingsModal } from './components/ClientSettingsModal';
 import { DeleteClientModal } from './components/DeleteClientModal';
 import { ManageCategoriesModal } from './components/ManageCategoriesModal';
-
-type Phase = { kind: 'loading' } | { kind: 'error'; message: string } | { kind: 'no-client' } | { kind: 'ready' };
-
-const RESIGN_EVERY_MS = 6 * 60 * 60 * 1000; // well inside the 12h signed-URL lifetime
-const REFRESH_MIN_GAP_MS = 60_000;
-const IMAGE_DELETE_DELAY_MS = 8000; // keep the image until the Undo toast is gone
+import { ToastView } from './components/ToastView';
+import { useToasts } from './data/useToasts';
+import { useBooks } from './data/useBooks';
+import { categoryActions } from './data/categoryActions';
+import { receiptActions } from './data/receiptActions';
+import { useReceiptImages, useResignImages } from './data/useReceiptImages';
 
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
-
-// Which client was last open on this device (a convenience only).
-const CLIENT_KEY = 'ftinvoices.clientId';
-const readClientId = () => {
-  try {
-    return localStorage.getItem(CLIENT_KEY);
-  } catch {
-    return null;
-  }
-};
-const saveClientId = (id: string) => {
-  try {
-    localStorage.setItem(CLIENT_KEY, id);
-  } catch {
-    /* non-essential */
-  }
-};
 
 /** Owns all data for the signed-in user (loaded from Supabase) and app-wide toasts. */
 export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const { session } = useAuth();
   const userId = session.user.id;
 
-  const [phase, setPhase] = useState<Phase>({ kind: 'loading' });
-  const [clients, setClients] = useState<Client[]>([]);
-  const [clientId, setClientId] = useState<string | null>(null);
   const [settings, setSettings] = useState<'edit' | 'new' | 'delete' | null>(null);
   const [managingCategories, setManagingCategories] = useState(false);
-  const client = clients.find((c) => c.id === clientId) ?? null;
-  const [categoryList, setCategoryList] = useState<Category[]>([]);
-  const [stored, setStored] = useState<db.StoredReceipt[]>([]);
-  /** Images of deleted receipts waiting out the Undo window: path → timer (one mutable Map for the provider's life). */
-  const [pendingDeletes] = useState(() => new Map<string, ReturnType<typeof setTimeout>>());
-  const [urls, setUrls] = useState<Map<string, string>>(() => new Map());
-  const [toast, setToast] = useState<Toast | null>(null);
-  const storedRef = useRef(stored);
-  /** When image links were last signed (ms); used to spot links that may have expired. */
-  const signedAtRef = useRef(0);
-  useEffect(() => {
-    storedRef.current = stored;
-  }, [stored]);
-
-  const notify = useCallback((msg: string, kind: Toast['kind'] = 'info', undo?: () => void) => {
-    const id = Date.now();
-    setToast({ id, msg, kind, undo });
-    setTimeout(() => setToast((t) => (t?.id === id ? null : t)), undo ? 6000 : 4000);
-  }, []);
-
-  /** Fetches everything, then applies it in one go (state is only set after the network calls). */
-  // silent: refresh in place, keeping the current screen if it fails.
-  const fetchBooks = useCallback(async (preferredId?: string, { silent = false } = {}) => {
-    try {
-      const all = await db.listClients();
-      if (!all.length) return setPhase({ kind: 'no-client' });
-      const want = preferredId ?? readClientId();
-      const c = all.find((x) => x.id === want) ?? all[0];
-      const [cats, recs] = await Promise.all([db.listCategories(c.id), db.listReceipts(c.id)]);
-      const signed = await db.signImages(recs.flatMap((r) => (r.imagePath ? [r.imagePath] : [])));
-      saveClientId(c.id);
-      setClients(all);
-      setClientId(c.id);
-      setCategoryList(cats);
-      setStored(recs);
-      setUrls(signed);
-      setPhase({ kind: 'ready' });
-    } catch (e) {
-      if (silent) console.error(e);
-      else setPhase({ kind: 'error', message: errMsg(e) });
-    }
-  }, []);
-
-  const reload = useCallback(
-    (preferredId?: string, opts: { silent?: boolean } = {}) => {
-      if (!opts.silent) setPhase({ kind: 'loading' });
-      return fetchBooks(preferredId, opts);
-    },
-    [fetchBooks],
-  );
-
-  // Coming back to the tab: pick up changes made on other devices (at most once a minute).
-  useEffect(() => {
-    if (phase.kind !== 'ready') return;
-    let last = Date.now();
-    const onVisible = () => {
-      if (document.visibilityState !== 'visible' || Date.now() - last < REFRESH_MIN_GAP_MS) return;
-      last = Date.now();
-      // Stay on this tab's client even if another tab switched (the choice is shared via localStorage).
-      void reload(clientId ?? undefined, { silent: true });
-    };
-    document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
-  }, [phase.kind, reload, clientId]);
+  const { urls, replaceUrls, mergeUrls, showLocal, scheduleImageDelete, cancelImageDelete, isPendingDelete } =
+    useReceiptImages(session.access_token);
+  const { toast, notify, dismiss: dismissToast } = useToasts();
+  const { phase, clients, setClients, client, categoryList, setCategoryList, stored, setStored, reload } =
+    useBooks(replaceUrls);
 
   const createClient = useCallback(
     async (c: Omit<Client, 'id'>) => {
@@ -124,67 +44,11 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       await db.updateClient(id, patch);
       setClients((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
     },
-    [],
+    [setClients],
   );
 
-  /** Deletes an image after the Undo window, unless cancelImageDelete is called first. */
-  const scheduleImageDelete = useCallback((path: string) => {
-    const timer = setTimeout(() => {
-      pendingDeletes.delete(path);
-      db.removeImages([path]).catch(console.error);
-    }, IMAGE_DELETE_DELAY_MS);
-    pendingDeletes.set(path, timer);
-  }, [pendingDeletes]);
-  const cancelImageDelete = useCallback((path: string) => {
-    clearTimeout(pendingDeletes.get(path));
-    pendingDeletes.delete(path);
-  }, [pendingDeletes]);
-
-  // If the page closes during an Undo window, delete those images now rather than never.
-  useEffect(() => {
-    const pending = pendingDeletes;
-    const flush = () => {
-      if (!pending.size) return;
-      for (const t of pending.values()) clearTimeout(t);
-      db.removeImagesOnExit([...pending.keys()]);
-      pending.clear();
-    };
-    window.addEventListener('pagehide', flush);
-    return () => window.removeEventListener('pagehide', flush);
-  }, [pendingDeletes]);
-
-  // Keep the token handy for keepalive requests sent while the page closes.
-  useEffect(() => db.setAccessToken(session.access_token), [session.access_token]);
-
-  useEffect(() => {
-    // Initial load from Supabase; state is only set after the awaited network calls.
-    // oxlint-disable-next-line react/set-state-in-effect
-    void fetchBooks();
-  }, [fetchBooks]);
-
-  // Signed URLs expire; refresh them periodically while the app stays open.
-  // Timers pause while the computer sleeps, so also check when the tab is shown or focused again.
-  useEffect(() => {
-    if (phase.kind !== 'ready') return;
-    // Becoming ready means fetchBooks has just signed every link.
-    signedAtRef.current = Date.now();
-    const resign = () => {
-      const paths = storedRef.current.flatMap((r) => (r.imagePath ? [r.imagePath] : []));
-      signedAtRef.current = Date.now();
-      db.signImages(paths).then((m) => setUrls((prev) => new Map([...prev, ...m])), console.error);
-    };
-    const resignIfStale = () => {
-      if (document.visibilityState === 'visible' && Date.now() - signedAtRef.current >= RESIGN_EVERY_MS) resign();
-    };
-    const t = setInterval(resign, RESIGN_EVERY_MS);
-    document.addEventListener('visibilitychange', resignIfStale);
-    window.addEventListener('focus', resignIfStale);
-    return () => {
-      clearInterval(t);
-      document.removeEventListener('visibilitychange', resignIfStale);
-      window.removeEventListener('focus', resignIfStale);
-    };
-  }, [phase.kind]);
+  const imagePaths = useMemo(() => stored.flatMap((r) => (r.imagePath ? [r.imagePath] : [])), [stored]);
+  useResignImages(imagePaths, phase.kind === 'ready', mergeUrls);
 
   const categoryNames = useMemo(() => new Map(categoryList.map((c) => [c.id, c.name])), [categoryList]);
 
@@ -227,184 +91,23 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       categoryList,
       categoryColor,
       openCategoryManager: () => setManagingCategories(true),
-      addCategory: async (name, color) => {
-        try {
-          const created = await db.insertCategory(client.id, name, color);
-          setCategoryList((prev) => [...prev, created]);
-          return true;
-        } catch (e) {
-          notify(`Couldn’t add category: ${errMsg(e)}`, 'error');
-          return false;
-        }
-      },
-      updateCategory: async (id, patch) => {
-        const before = categoryList;
-        setCategoryList((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
-        try {
-          await db.updateCategory(id, patch);
-          return true;
-        } catch (e) {
-          setCategoryList(before);
-          notify(`Couldn’t update category: ${errMsg(e)}`, 'error');
-          return false;
-        }
-      },
-      mergeCategory: async (fromId, toId) => {
-        try {
-          await db.reassignReceipts(client.id, fromId, toId);
-          setStored((prev) => prev.map((r) => (r.categoryId === fromId ? { ...r, categoryId: toId } : r)));
-          await db.deleteCategory(fromId);
-          setCategoryList((prev) => prev.filter((c) => c.id !== fromId));
-          return true;
-        } catch (e) {
-          notify(`Couldn’t merge: ${errMsg(e)}`, 'error');
-          return false;
-        }
-      },
-      deleteCategory: async (id) => {
-        try {
-          await db.deleteCategory(id);
-          setCategoryList((prev) => prev.filter((c) => c.id !== id));
-          return true;
-        } catch (e) {
-          notify(`Couldn’t delete category: ${errMsg(e)}`, 'error');
-          return false;
-        }
-      },
+      ...categoryActions({ clientId: client.id, categoryList, setCategoryList, setStored, notify }),
       stagger: client.stagger,
 
-      saveReceipt: async (draft, newCategory) => {
-        const existing = stored.find((r) => r.id === draft.id);
-        let uploadedPath: string | undefined;
-        try {
-          // 1. Category (create it first if new)
-          let category = categoryList.find((c) => c.name === draft.category);
-          if (newCategory) {
-            category = await db.insertCategory(client.id, newCategory.name, newCategory.color);
-            const created = category;
-            setCategoryList((prev) => [...prev, created]);
-          }
-          if (!category) throw new Error(`Unknown category “${draft.category}”`);
-
-          // 2. Image: upload a new one, keep the old one, or drop it
-          let imagePath = existing?.imagePath;
-          const isNewImage = draft.image?.startsWith('data:');
-          if (isNewImage) {
-            uploadedPath = db.imagePathFor(userId, client.id, draft.id);
-            await db.uploadImage(uploadedPath, await dataUrlToBlob(draft.image!));
-            imagePath = uploadedPath;
-          } else if (!draft.image) {
-            imagePath = undefined;
-          }
-
-          // 3. Row. Edits only apply if nobody changed the receipt elsewhere meanwhile.
-          const row: db.StoredReceipt = {
-            id: draft.id,
-            clientId: client.id,
-            categoryId: category.id,
-            name: draft.name,
-            total: draft.total,
-            vat: draft.vat,
-            date: draft.date,
-            imagePath,
-            createdAt: existing?.createdAt ?? Date.now(),
-          };
-          const saved = existing?.updatedAt ? await db.updateReceipt(row, existing.updatedAt) : await db.upsertReceipt(row);
-
-          // Show the freshly uploaded image straight from memory; no need to sign it yet.
-          if (isNewImage && imagePath) {
-            const path = imagePath;
-            setUrls((prev) => new Map(prev).set(path, draft.image!));
-          }
-          setStored((prev) => (existing ? prev.map((r) => (r.id === saved.id ? saved : r)) : [...prev, saved]));
-
-          // Old image replaced or removed → delete it from storage.
-          if (existing?.imagePath && existing.imagePath !== imagePath) {
-            db.removeImages([existing.imagePath]).catch(console.error);
-          }
-          notify(existing ? 'Receipt updated' : `Added “${draft.name}”`);
-          return true;
-        } catch (e) {
-          if (uploadedPath) db.removeImages([uploadedPath]).catch(console.error);
-          if (e instanceof db.ReceiptConflictError) {
-            // Load the newer version; the form stays open, so saving again overwrites it on purpose.
-            void reload(client.id, { silent: true });
-            notify(`${e.message}. The latest version is loaded — save again to replace it.`, 'error');
-            return false;
-          }
-          notify(`Couldn’t save: ${errMsg(e)}`, 'error');
-          return false;
-        }
-      },
-
-      deleteReceipt: (receipt) => {
-        const row = stored.find((r) => r.id === receipt.id);
-        if (!row) return;
-        setStored((prev) => prev.filter((r) => r.id !== row.id));
-        db.deleteReceipt(row.id).then(
-          () => {
-            if (row.imagePath) scheduleImageDelete(row.imagePath);
-            notify(`Deleted “${row.name}”`, 'info', async () => {
-              if (row.imagePath) cancelImageDelete(row.imagePath);
-              setToast(null);
-              try {
-                const restored = await db.upsertReceipt(row);
-                setStored((prev) => (prev.some((r) => r.id === restored.id) ? prev : [...prev, restored]));
-              } catch (e) {
-                notify(`Couldn’t restore: ${errMsg(e)}`, 'error');
-              }
-            });
-          },
-          (e) => {
-            setStored((prev) => (prev.some((r) => r.id === row.id) ? prev : [...prev, row]));
-            notify(`Couldn’t delete: ${errMsg(e)}`, 'error');
-          },
-        );
-      },
-
-      deleteReceipts: (list) => {
-        const ids = new Set(list.map((r) => r.id));
-        const rows = stored.filter((r) => ids.has(r.id));
-        if (!rows.length) return;
-        setStored((prev) => prev.filter((r) => !ids.has(r.id)));
-        db.deleteReceipts([...ids]).then(
-          () => {
-            const paths = rows.flatMap((r) => (r.imagePath ? [r.imagePath] : []));
-            const timer = paths.length
-              ? setTimeout(() => db.removeImages(paths).catch(console.error), IMAGE_DELETE_DELAY_MS)
-              : undefined;
-            notify(`Deleted ${rows.length} receipt${rows.length === 1 ? '' : 's'}`, 'info', async () => {
-              clearTimeout(timer);
-              setToast(null);
-              try {
-                const restored = await db.restoreReceipts(rows);
-                setStored((prev) => [...prev.filter((r) => !ids.has(r.id)), ...restored]);
-              } catch (e) {
-                notify(`Couldn’t restore: ${errMsg(e)}`, 'error');
-              }
-            });
-          },
-          (e) => {
-            setStored((prev) => [...prev.filter((r) => !ids.has(r.id)), ...rows]);
-            notify(`Couldn’t delete: ${errMsg(e)}`, 'error');
-          },
-        );
-      },
-
-      moveReceipts: async (list, categoryName) => {
-        const category = categoryList.find((c) => c.name === categoryName);
-        if (!category) return false;
-        try {
-          const updated = await db.setReceiptsCategory(client.id, list.map((r) => r.id), category.id);
-          const byId = new Map(updated.map((r) => [r.id, r]));
-          setStored((prev) => prev.map((r) => byId.get(r.id) ?? r));
-          notify(`Moved ${updated.length} receipt${updated.length === 1 ? '' : 's'} to “${category.name}”`);
-          return true;
-        } catch (e) {
-          notify(`Couldn’t move receipts: ${errMsg(e)}`, 'error');
-          return false;
-        }
-      },
+      ...receiptActions({
+        userId,
+        clientId: client.id,
+        categoryList,
+        setCategoryList,
+        stored,
+        setStored,
+        reloadSilently: () => void reload(client.id, { silent: true }),
+        notify,
+        dismissToast,
+        showLocal,
+        scheduleImageDelete,
+        cancelImageDelete,
+      }),
 
       exportList: async (list, format, label) => {
         try {
@@ -416,7 +119,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       },
       notify,
     };
-  }, [client, clients, reload, stored, receipts, categories, categoryList, categoryColor, userId, notify, scheduleImageDelete, cancelImageDelete]);
+  }, [client, clients, reload, stored, receipts, categories, categoryList, categoryColor, userId, notify, dismissToast, setStored, setCategoryList, scheduleImageDelete, cancelImageDelete, showLocal]);
 
   if (phase.kind !== 'ready' || !value) {
     return (
@@ -441,7 +144,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
             const used = new Set(stored.flatMap((r) => (r.imagePath ? [r.imagePath] : [])));
             const all = await db.listImages(`${userId}/${value.client.id}`);
             // Images waiting out an Undo window aren't "unused" yet.
-            return all.filter((p) => !used.has(p) && !pendingDeletes.has(p));
+            return all.filter((p) => !used.has(p) && !isPendingDelete(p));
           }}
           onRemoveImages={(paths) => db.removeImages(paths)}
           onSave={async (c) => {
@@ -484,16 +187,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
           }}
         />
       )}
-      {toast && (
-        <div className={`toast ${toast.kind}`} role={toast.kind === 'error' ? 'alert' : 'status'}>
-          <span>{toast.msg}</span>
-          {toast.undo && (
-            <button type="button" className="link-btn" onClick={toast.undo}>
-              Undo
-            </button>
-          )}
-        </div>
-      )}
+      <ToastView toast={toast} />
     </Ctx.Provider>
   );
 }
