@@ -3,7 +3,7 @@ import { urlToDataUrl } from './image';
 import { formatMonthKey, round2, todayIso } from './format';
 import { groupByMonth, groupByYear, sumTotals } from './receipts';
 
-export type ExportFormat = 'xlsx' | 'csv' | 'json';
+export type ExportFormat = 'xlsx' | 'csv' | 'json' | 'zip';
 
 const HEADERS = ['Date', 'Name', 'Category', 'Total', 'VAT', 'Net', 'Has image'] as const;
 
@@ -35,10 +35,56 @@ function csvCell(v: string | number): string {
   return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 }
 
-function exportCsv(receipts: Receipt[], base: string) {
+function csvText(receipts: Receipt[]): string {
   const lines = [HEADERS.join(','), ...receipts.map((r) => toRow(r).map(csvCell).join(','))];
   // BOM so Excel opens UTF-8 (e.g. £, accents) correctly.
-  download(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }), `${base}.csv`);
+  return '﻿' + lines.join('\r\n');
+}
+
+function exportCsv(receipts: Receipt[], base: string) {
+  download(new Blob([csvText(receipts)], { type: 'text/csv;charset=utf-8' }), `${base}.csv`);
+}
+
+/**
+ * A readable, filesystem-safe name like "2026-11-02_Shell_£60.00.jpg". `taken` holds names already
+ * used (lower-cased) so two receipts never overwrite each other: the second gets " (2)".
+ */
+export function imageFileName(r: Pick<Receipt, 'date' | 'name' | 'total'>, taken: Set<string>): string {
+  const name =
+    r.name
+      // Characters Windows and macOS don't allow in file names, and control characters.
+      // oxlint-disable-next-line eslint/no-control-regex
+      .replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/[. ]+$/, '')
+      .slice(0, 60) || 'receipt';
+  const base = `${r.date}_${name}_£${r.total.toFixed(2)}`;
+  let file = `${base}.jpg`;
+  for (let n = 2; taken.has(file.toLowerCase()); n++) file = `${base} (${n}).jpg`;
+  taken.add(file.toLowerCase());
+  return file;
+}
+
+/** The receipts' photos, named by date, supplier and amount, plus receipts.csv, in one zip. */
+async function exportZip(receipts: Receipt[], base: string) {
+  const withImages = receipts.filter((r) => r.image);
+  if (!withImages.length) throw new Error('None of these receipts have photos');
+  const { zipSync, strToU8 } = await import('fflate');
+  const taken = new Set<string>();
+  const names = withImages.map((r) => imageFileName(r, taken));
+  const images = await Promise.all(
+    withImages.map(async (r) => {
+      const res = await fetch(r.image!);
+      if (!res.ok) throw new Error(`Couldn’t download the photo for ${r.name} (${res.status})`);
+      return new Uint8Array(await res.arrayBuffer());
+    }),
+  );
+  const files: Record<string, Uint8Array> = { 'receipts.csv': strToU8(csvText(receipts)) };
+  names.forEach((n, i) => (files[n] = images[i]));
+  // Photos are already JPEG-compressed, so store them as they are.
+  const zip = zipSync(files, { level: 0 });
+  download(new Blob([zip as Uint8Array<ArrayBuffer>], { type: 'application/zip' }), `${base}-photos.zip`);
 }
 
 async function exportJson(receipts: Receipt[], base: string, meta?: ExportMeta) {
@@ -126,6 +172,7 @@ export async function exportReceipts(receipts: Receipt[], format: ExportFormat, 
   const sorted = [...receipts].sort((a, b) => a.date.localeCompare(b.date));
   const base = [meta && slug(meta.client), label, todayIso()].filter(Boolean).join('-');
   if (format === 'csv') exportCsv(sorted, base);
+  else if (format === 'zip') await exportZip(sorted, base);
   else if (format === 'json') await exportJson(sorted, base, meta);
   else await exportXlsx(sorted, base, meta);
 }

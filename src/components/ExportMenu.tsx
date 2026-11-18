@@ -12,6 +12,7 @@ const OPTIONS: { format: ExportFormat; label: string; hint: string }[] = [
   { format: 'xlsx', label: 'Spreadsheet', hint: '.xlsx' },
   { format: 'csv', label: 'CSV', hint: '.csv' },
   { format: 'json', label: 'JSON', hint: '.json · incl. images' },
+  { format: 'zip', label: 'Photos', hint: '.zip · named by date & amount' },
 ];
 
 export function ExportMenu({ onExport, disabled, label = 'Export', small }: Props) {
