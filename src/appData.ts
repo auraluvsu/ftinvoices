@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import type { Category, Client, FiledQuarter, NewCategory, Receipt, ReceiptDraft, RecurringExpense } from './types';
+import type { Category, Client, FiledQuarter, Income, NewCategory, Receipt, ReceiptDraft, RecurringExpense } from './types';
 import type { ExportFormat } from './lib/export';
 import type { QuarterStagger } from './lib/quarters';
 import type { VatReturnBoxes } from './lib/vatReturn';
@@ -63,6 +63,12 @@ export interface AppData {
     entries: { date: string; add: boolean; total: number; vat: number }[],
   ) => Promise<boolean>;
   deleteRecurring: (expense: RecurringExpense) => Promise<boolean>;
+  /** Income (sales), newest first. */
+  income: Income[];
+  /** Adds or updates an income record. Resolves false if it couldn't be saved. */
+  saveIncome: (item: Income) => Promise<boolean>;
+  /** Deletes an income record, with Undo. */
+  deleteIncome: (item: Income) => void;
   notify: (msg: string, kind?: Toast['kind'], undo?: () => void) => void;
 }
 

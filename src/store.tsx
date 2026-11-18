@@ -16,6 +16,7 @@ import { categoryActions } from './data/categoryActions';
 import { receiptActions } from './data/receiptActions';
 import { filedActions } from './data/filedActions';
 import { recurringActions } from './data/recurringActions';
+import { incomeActions } from './data/incomeActions';
 import { dueDates } from './lib/recurring';
 import { todayIso } from './lib/format';
 import { filedQuarterFor } from './lib/filedQuarters';
@@ -33,7 +34,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const { urls, replaceUrls, mergeUrls, showLocal, scheduleImageDelete, cancelImageDelete, isPendingDelete } =
     useReceiptImages(session.access_token);
   const { toast, notify, dismiss: dismissToast } = useToasts();
-  const { phase, clients, setClients, client, categoryList, setCategoryList, stored, setStored, filed, setFiled, recurring, setRecurring, reload } =
+  const { phase, clients, setClients, client, categoryList, setCategoryList, stored, setStored, filed, setFiled, recurring, setRecurring, income, setIncome, reload } =
     useBooks(replaceUrls);
   const lockedBy = useCallback((date: string) => filedQuarterFor(date, filed), [filed]);
   // Worked out when the books load or change; a tab left open past midnight picks up new ones on refresh.
@@ -124,6 +125,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         lockedBy,
         setRecurring,
       }),
+      income,
+      ...incomeActions({ income, setIncome, notify, dismissToast, lockedBy }),
       recurring,
       dueRecurring,
       ...recurringActions({
@@ -148,7 +151,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       },
       notify,
     };
-  }, [client, clients, reload, stored, receipts, categories, categoryList, categoryColor, userId, notify, dismissToast, setStored, setCategoryList, scheduleImageDelete, cancelImageDelete, showLocal, filed, setFiled, lockedBy, recurring, setRecurring, dueRecurring]);
+  }, [client, clients, reload, stored, receipts, categories, categoryList, categoryColor, userId, notify, dismissToast, setStored, setCategoryList, scheduleImageDelete, cancelImageDelete, showLocal, filed, setFiled, lockedBy, recurring, setRecurring, dueRecurring, income, setIncome]);
 
   if (phase.kind !== 'ready' || !value) {
     return (
