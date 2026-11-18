@@ -47,7 +47,7 @@ If anything fails, copy the error message from the screen or the browser console
 - **Old browser data isn't used.** Receipts saved in this browser before the move to Supabase are ignored (you chose to start fresh). They stay in the browser's storage until cleared.
 - **VAT quarter setting moved** from the Quarterly review tab into Client settings, because it's now per client.
 - **Storage meter removed.** The ~5 MB browser limit no longer applies.
-- **Bundle size.** The Supabase library takes the main bundle just over Vite's 500 kB warning (about 170 kB compressed). It works fine; it could be split into smaller chunks if load time matters.
+- **Bundle size.** Pages load on demand, and React, React Router and Supabase are split into separate chunks that browsers cache between releases. The app's own code is about 42 kB (14 kB compressed); the spreadsheet library still loads only when you export.
 
 ## Ideas for later
 
