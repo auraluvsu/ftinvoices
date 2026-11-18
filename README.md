@@ -8,14 +8,14 @@ Built with React + TypeScript (Vite), with data stored in Supabase behind Google
 
 **Receipts**
 - Record a receipt's name, total (inc. VAT), VAT, category, date and an optional photo (upload, drag & drop or paste).
-- "Calc 20%" works out VAT from a VAT-inclusive total.
+- Each receipt has a **VAT rate**: standard 20%, reduced 5%, zero-rated, exempt, or no VAT (supplier not VAT registered). "Calc" works out VAT from the VAT-inclusive total at that rate; the last three fix VAT at £0. A known supplier brings its last rate with it.
 - **Read receipt** fills in the shop name, total, VAT, date and category from the photo using Claude. It only fills empty fields and briefly highlights what it filled.
 - **Supplier memory**: the name field suggests past suppliers, and picking one sets the category you last used for it.
 - **Duplicate warning**: saving a receipt with the same supplier and total as one within 3 days asks before saving it twice.
 - Click any receipt to edit it in a popup; delete with Undo.
 
 **Organising**
-- Receipts grouped by year and month, with sort (date, price, VAT, name) and filters (price, VAT, date, category) per month.
+- Receipts grouped by year and month, with sort (date, price, VAT, name) and filters (price, VAT, date, category, VAT rate) per month.
 - **Search** across all receipts by name, category or amount (`fuel 49`, `£240`).
 - **Select** several receipts (or all search results) to move them to a category, export them or delete them in one go, with a single Undo.
 - **Colour-coded categories**, each with its own colour. Manage them from the popup: rename, recolour with swatches or a colour wheel, merge, delete unused, add new.
