@@ -69,6 +69,7 @@ export interface MonthFilters {
   dateFrom: string;
   dateTo: string;
   categories: string[];
+  vatRates: VatRate[];
 }
 
 export const emptyFilters: MonthFilters = {
@@ -79,6 +80,7 @@ export const emptyFilters: MonthFilters = {
   dateFrom: '',
   dateTo: '',
   categories: [],
+  vatRates: [],
 };
 
 export type Theme = 'system' | 'light' | 'dark';

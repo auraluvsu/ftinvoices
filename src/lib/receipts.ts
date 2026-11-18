@@ -46,6 +46,7 @@ export function applyFilters(receipts: Receipt[], f: MonthFilters): Receipt[] {
     if (f.dateFrom && r.date < f.dateFrom) return false;
     if (f.dateTo && r.date > f.dateTo) return false;
     if (f.categories.length && !f.categories.includes(r.category)) return false;
+    if (f.vatRates.length && !f.vatRates.includes(r.vatRate)) return false;
     return true;
   });
 }
@@ -75,7 +76,9 @@ export function sortReceipts(receipts: Receipt[], field: SortField, dir: SortDir
 export function activeFilterCount(f: MonthFilters): number {
   return (
     [f.minTotal, f.maxTotal, f.minVat, f.maxVat, f.dateFrom, f.dateTo].filter((v) => v !== '')
-      .length + (f.categories.length ? 1 : 0)
+      .length +
+    (f.categories.length ? 1 : 0) +
+    (f.vatRates.length ? 1 : 0)
   );
 }
 

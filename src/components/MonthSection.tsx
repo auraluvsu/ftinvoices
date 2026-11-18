@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { emptyFilters, type MonthFilters, type Receipt, type SortDir, type SortField } from '../types';
 import { formatDate, formatMoney, formatMonthKey } from '../lib/format';
 import { activeFilterCount, applyFilters, sortReceipts, sumTotals } from '../lib/receipts';
+import { VAT_RATES, type VatRate } from '../lib/vatRates';
 import type { ExportFormat } from '../lib/export';
 import { ExportMenu } from './ExportMenu';
 import { useAppData } from '../appData';
@@ -47,6 +48,8 @@ export function MonthSection({
 
   const monthTotals = useMemo(() => sumTotals(receipts), [receipts]);
   const categories = useMemo(() => [...new Set(receipts.map((r) => r.category))].sort(), [receipts]);
+  // Only offer rates this month actually has, in the usual order.
+  const rates = useMemo(() => VAT_RATES.filter((v) => receipts.some((r) => r.vatRate === v.id)), [receipts]);
   const visible = useMemo(
     () => sortReceipts(applyFilters(receipts, filters), sortField, sortDir),
     [receipts, filters, sortField, sortDir],
@@ -61,6 +64,8 @@ export function MonthSection({
   const setF = <K extends keyof MonthFilters>(k: K, v: MonthFilters[K]) => setFilters((f) => ({ ...f, [k]: v }));
   const toggleCategory = (c: string) =>
     setF('categories', filters.categories.includes(c) ? filters.categories.filter((x) => x !== c) : [...filters.categories, c]);
+  const toggleRate = (r: VatRate) =>
+    setF('vatRates', filters.vatRates.includes(r) ? filters.vatRates.filter((x) => x !== r) : [...filters.vatRates, r]);
 
   return (
     <section className={`card month${open ? ' open' : ''}`}>
@@ -165,6 +170,21 @@ export function MonthSection({
                   ))}
                 </div>
               </div>
+              {rates.length > 1 && (
+                <div className="filter filter-wide">
+                  <span className="field-label">VAT rate</span>
+                  <div className="chips">
+                    {rates.map((r) => (
+                      <button key={r.id} type="button"
+                        className={`chip${filters.vatRates.includes(r.id) ? ' selected' : ''}`}
+                        aria-pressed={filters.vatRates.includes(r.id)}
+                        onClick={() => toggleRate(r.id)}>
+                        {r.short}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               {nFilters > 0 && (
                 <button type="button" className="link-btn" onClick={() => setFilters(emptyFilters)}>
                   Clear all filters
