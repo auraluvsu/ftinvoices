@@ -13,6 +13,8 @@ const router = createBrowserRouter([
       { index: true, element: <HomePage /> },
       { path: 'receipts', element: <ReceiptsPage /> },
       { path: '*', element: <Navigate to="/" replace /> },
+      // Printable report for a date range (see ReportPage); loaded on demand.
+      { path: 'report', lazy: async () => ({ Component: (await import('./pages/ReportPage')).ReportPage }) },
     ],
   },
 ]);

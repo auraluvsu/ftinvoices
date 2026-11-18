@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router';
 import type { Receipt } from '../types';
 import { formatMoney, formatMonthKey } from '../lib/format';
 import { sumTotals } from '../lib/receipts';
@@ -39,6 +40,18 @@ export function QuarterlyReview({ receipts, stagger, onEditSettings, onExport }:
   );
 }
 
+/** Link to the printable report covering a quarter's three months. */
+function reportLink(q: QuarterGroup): string {
+  const [y, m] = q.months[2].key.split('-').map(Number);
+  const lastDay = new Date(y, m, 0).getDate();
+  const params = new URLSearchParams({
+    from: `${q.months[0].key}-01`,
+    to: `${q.months[2].key}-${String(lastDay).padStart(2, '0')}`,
+    title: `VAT quarter ${q.label}`,
+  });
+  return `/report?${params}`;
+}
+
 function QuarterCard({
   quarter,
   previous,
@@ -65,7 +78,12 @@ function QuarterCard({
             {t.count} receipt{t.count === 1 ? '' : 's'}
           </span>
         </div>
-        <ExportMenu small label="Export" onExport={(fmt) => onExport(quarter.receipts, fmt, fileLabel)} />
+        <div className="quarter-actions">
+          <Link className="btn btn-secondary btn-sm" to={reportLink(quarter)}>
+            Report
+          </Link>
+          <ExportMenu small label="Export" onExport={(fmt) => onExport(quarter.receipts, fmt, fileLabel)} />
+        </div>
       </header>
 
       <div className="quarter-stats">
