@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { Receipt } from '../types';
 import { formatMoney, formatMonthKey } from '../lib/format';
 import { sumTotals } from '../lib/receipts';
@@ -7,6 +7,7 @@ import type { ExportFormat } from '../lib/export';
 import { ExportMenu } from './ExportMenu';
 import { useAppData } from '../appData';
 import { catVar } from '../lib/color';
+import { box4Text, box7Text, vatReturnBoxes } from '../lib/vatReturn';
 
 interface Props {
   receipts: Receipt[];
@@ -88,6 +89,8 @@ function QuarterCard({
         </div>
       </div>
 
+      <VatReturnStrip receipts={quarter.receipts} />
+
       <div className="quarter-body">
         <div>
           <h4>By month</h4>
@@ -140,5 +143,47 @@ function QuarterCard({
         </div>
       </div>
     </section>
+  );
+}
+
+/** Box 4 and Box 7 of the VAT return, with copy buttons for pasting into HMRC software. */
+function VatReturnStrip({ receipts }: { receipts: Receipt[] }) {
+  const { box4, box7 } = vatReturnBoxes(receipts);
+  return (
+    <div className="vat-return" aria-label="VAT return figures">
+      <VatBox box="Box 4" label="VAT reclaimed on purchases" display={formatMoney(box4)} copyText={box4Text(box4)} />
+      <VatBox
+        box="Box 7"
+        label="Purchases excluding VAT (whole pounds)"
+        display={`£${box7.toLocaleString('en-GB')}`}
+        copyText={box7Text(box7)}
+      />
+      <p className="vat-return-note muted">
+        Assumes all VAT on these receipts can be reclaimed. Sales boxes (1, 3, 6) aren’t worked out here.
+      </p>
+    </div>
+  );
+}
+
+function VatBox({ box, label, display, copyText }: { box: string; label: string; display: string; copyText: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(copyText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard blocked: the figure is still on screen to copy by hand */
+    }
+  };
+  return (
+    <div className="vat-box">
+      <span className="vat-box-num">{box}</span>
+      <span className="vat-box-label">{label}</span>
+      <strong>{display}</strong>
+      <button type="button" className="btn btn-ghost btn-sm" onClick={copy} aria-label={`Copy ${box}: ${copyText}`}>
+        {copied ? 'Copied' : 'Copy'}
+      </button>
+    </div>
   );
 }

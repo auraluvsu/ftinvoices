@@ -340,6 +340,17 @@ input[type='number']::-webkit-inner-spin-button { opacity: .4; }
 .qstat small.up { color: var(--danger); }
 .qstat small.down { color: var(--accent-text); }
 .qstat-accent { background: var(--accent-soft); border-color: var(--accent); }
+.vat-return { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.vat-box {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center; column-gap: 10px; row-gap: 2px;
+  padding: 10px 12px; border: 1px dashed var(--border); border-radius: var(--radius-sm);
+}
+.vat-box-num { grid-row: span 2; font-size: .72rem; font-weight: 650; text-transform: uppercase; letter-spacing: .05em;
+  padding: 4px 8px; border-radius: 99px; background: var(--surface-2); color: var(--muted); }
+.vat-box-label { font-size: .78rem; color: var(--muted); }
+.vat-box strong { grid-column: 2; font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+.vat-box .btn { grid-column: 3; grid-row: 1 / span 2; }
+.vat-return-note { grid-column: 1 / -1; margin: 0; font-size: .75rem; }
 .quarter-body { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 .quarter-body h4 { margin: 0 0 8px; font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .qtable { width: 100%; border-collapse: collapse; font-size: .88rem; }
@@ -357,6 +368,7 @@ input[type='number']::-webkit-inner-spin-button { opacity: .4; }
   .quarter-body { grid-template-columns: 1fr; }
   .quarter-stats { grid-template-columns: 1fr 1fr; }
   .quarter-stats .qstat:first-child { grid-column: span 2; }
+  .vat-return { grid-template-columns: 1fr; }
 }
 
 /* ---------- Year group ---------- */
