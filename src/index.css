@@ -423,6 +423,13 @@ input[type='number']::-webkit-inner-spin-button { opacity: .4; }
 .search input { flex: 1; min-width: 0; height: 100%; border: none; background: none; outline: none; color: var(--text); padding: 0; }
 .search input:focus { box-shadow: none; }
 .search input::-webkit-search-cancel-button { display: none; }
+.dup-warning {
+  display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; font-size: .88rem;
+  border: 1px solid var(--danger); border-radius: var(--radius-sm); background: var(--danger-soft);
+  animation: fade .25s var(--ease-out);
+}
+.dup-warning p { margin: 0; }
+.dup-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .field-hint { font-size: .78rem; color: var(--muted); animation: fade .25s var(--ease-out); }
 .field-hint strong { color: var(--text); }
 .filter-summary { font-size: .88rem; color: var(--muted); }
