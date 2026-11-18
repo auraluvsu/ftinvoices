@@ -178,11 +178,11 @@ export async function listImages(folder: string): Promise<string[]> {
 }
 
 // The latest access token, kept so images can be deleted while the page is closing,
-// when there's no time to await getSession().
+// when there's no time to await getSession(). The store keeps it up to date.
 let accessToken: string | null = null;
-supabase.auth.onAuthStateChange((_event, session) => {
-  accessToken = session?.access_token ?? null;
-});
+export function setAccessToken(token: string | null): void {
+  accessToken = token;
+}
 
 /**
  * Deletes images with a `keepalive` request, which the browser finishes even after the

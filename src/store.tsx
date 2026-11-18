@@ -133,6 +133,9 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('pagehide', flush);
   }, [pendingDeletes]);
 
+  // Keep the token handy for keepalive requests sent while the page closes.
+  useEffect(() => db.setAccessToken(session.access_token), [session.access_token]);
+
   useEffect(() => {
     // Initial load from Supabase; state is only set after the awaited network calls.
     // oxlint-disable-next-line react/set-state-in-effect
