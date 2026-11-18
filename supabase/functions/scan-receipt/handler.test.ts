@@ -82,6 +82,37 @@ describe('scan-receipt handler: requests', () => {
   });
 });
 
+describe('scan-receipt handler: sign-in', () => {
+  it('rejects a caller who is not signed in, before reading the body or calling Claude', async () => {
+    const { handler, send } = setup({ signedIn: false });
+    const { status, body } = await call(handler, post(valid));
+    expect(status).toBe(401);
+    expect(body.error).toBe('Sign in to scan receipts');
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('treats an error while checking sign-in as signed out, and logs it', async () => {
+    const err = new Error('auth server down');
+    const { handler, log, send } = setup({ signedIn: err });
+    expect((await call(handler, post(valid))).status).toBe(401);
+    expect(log).toHaveBeenCalledWith(err);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('passes the request to authenticate', async () => {
+    const { handler, authenticate } = setup();
+    const req = post(valid);
+    await handler(req);
+    expect(authenticate).toHaveBeenCalledWith(req);
+  });
+
+  it('lets CORS preflight through without signing in', async () => {
+    const { handler, authenticate } = setup({ signedIn: false });
+    expect((await call(handler, new Request('https://x/', { method: 'OPTIONS' }))).status).toBe(200);
+    expect(authenticate).not.toHaveBeenCalled();
+  });
+});
+
 describe('scan-receipt handler: request to Claude', () => {
   it('strips the data URL prefix and sends the image, model and categories', async () => {
     const { handler, send } = setup();
