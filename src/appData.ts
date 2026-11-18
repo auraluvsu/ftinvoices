@@ -15,6 +15,8 @@ export interface AppData {
   client: Client;
   clients: Client[];
   switchClient: (id: string) => void;
+  /** Reloads the open client's books from Supabase (e.g. after a restore). */
+  reloadBooks: () => Promise<void>;
   /** Opens the client settings popup (for the open client, or a new one). */
   openClientSettings: (mode?: 'edit' | 'new') => void;
   receipts: Receipt[];
