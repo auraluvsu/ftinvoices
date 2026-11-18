@@ -61,7 +61,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   /** Fetches everything, then applies it in one go (state is only set after the network calls). */
-  const fetchBooks = useCallback(async (preferredId?: string) => {
+  // silent: refresh in place, keeping the current screen if it fails.
+  const fetchBooks = useCallback(async (preferredId?: string, { silent = false } = {}) => {
     try {
       const all = await db.listClients();
       if (!all.length) return setPhase({ kind: 'no-client' });
@@ -77,7 +78,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       setUrls(signed);
       setPhase({ kind: 'ready' });
     } catch (e) {
-      setPhase({ kind: 'error', message: errMsg(e) });
+      if (silent) console.error(e);
+      else setPhase({ kind: 'error', message: errMsg(e) });
     }
   }, []);
 
@@ -231,8 +233,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
             imagePath = undefined;
           }
 
-          // 3. Row
-          const saved = await db.upsertReceipt({
+          // 3. Row. Edits only apply if nobody changed the receipt elsewhere meanwhile.
+          const row: db.StoredReceipt = {
             id: draft.id,
             clientId: client.id,
             categoryId: category.id,
@@ -242,7 +244,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
             date: draft.date,
             imagePath,
             createdAt: existing?.createdAt ?? Date.now(),
-          });
+          };
+          const saved = existing?.updatedAt ? await db.updateReceipt(row, existing.updatedAt) : await db.upsertReceipt(row);
 
           // Show the freshly uploaded image straight from memory; no need to sign it yet.
           if (isNewImage && imagePath) {
@@ -259,6 +262,12 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
           return true;
         } catch (e) {
           if (uploadedPath) db.removeImages([uploadedPath]).catch(console.error);
+          if (e instanceof db.ReceiptConflictError) {
+            // Load the newer version; the form stays open, so saving again overwrites it on purpose.
+            void fetchBooks(undefined, { silent: true });
+            notify(`${e.message}. The latest version is loaded — save again to replace it.`, 'error');
+            return false;
+          }
           notify(`Couldn’t save: ${errMsg(e)}`, 'error');
           return false;
         }
@@ -301,7 +310,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       },
       notify,
     };
-  }, [client, clients, reload, stored, receipts, categories, categoryList, categoryColor, userId, notify]);
+  }, [client, clients, reload, stored, receipts, categories, categoryList, categoryColor, userId, notify, fetchBooks]);
 
   if (phase.kind !== 'ready' || !value) {
     return (
