@@ -50,6 +50,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const [urls, setUrls] = useState<Map<string, string>>(() => new Map());
   const [toast, setToast] = useState<Toast | null>(null);
   const storedRef = useRef(stored);
+  /** When image links were last signed (ms); used to spot links that may have expired. */
+  const signedAtRef = useRef(0);
   useEffect(() => {
     storedRef.current = stored;
   }, [stored]);
@@ -114,8 +116,11 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   // Signed URLs expire; refresh them periodically while the app stays open.
   useEffect(() => {
     if (phase.kind !== 'ready') return;
+    // Becoming ready means fetchBooks has just signed every link.
+    signedAtRef.current = Date.now();
     const t = setInterval(() => {
       const paths = storedRef.current.flatMap((r) => (r.imagePath ? [r.imagePath] : []));
+      signedAtRef.current = Date.now();
       db.signImages(paths).then((m) => setUrls((prev) => new Map([...prev, ...m])), console.error);
     }, RESIGN_EVERY_MS);
     return () => clearInterval(t);
