@@ -37,6 +37,7 @@ Built with React + TypeScript (Vite), with data stored in Supabase behind Google
 - Supabase: Postgres (row-level security), Storage (private image bucket), Auth (Google OAuth), Edge Functions
 - Claude API (`claude-opus-5-5`) for receipt reading, called only from the Edge Function
 - SheetJS (`xlsx`, lazy-loaded) for spreadsheet export
+- Vitest for unit tests (`*.test.ts` next to the code they cover)
 
 ## Getting started
 
@@ -54,6 +55,8 @@ The app needs a Supabase project first. See [docs/NEXT-STEPS.md](docs/NEXT-STEPS
 | `npm run build` | Type-check and build to `dist/` |
 | `npm run preview` | Serve the production build locally |
 | `npm run lint` | Lint with oxlint |
+| `npm test` | Run the unit tests once (Vitest) |
+| `npm run test:watch` | Re-run tests as files change |
 
 ## Project layout
 
@@ -69,9 +72,11 @@ src/
     receipts.ts, quarters.ts  grouping, totals, sorting, search, VAT quarters
     export.ts               xlsx / CSV / JSON export
     color.ts, image.ts, format.ts
+    scan.ts                 which form fields a receipt scan fills
 supabase/
   schema.sql                tables, row-level security, storage bucket
   functions/scan-receipt/   Edge Function that reads receipts with Claude
+                            (index.ts wires Deno; handler.ts holds the tested logic)
   README.md                 detailed Supabase setup
 docs/
   SCHEMA.md                 database design explained
