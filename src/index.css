@@ -357,6 +357,18 @@ input[type='number']::-webkit-inner-spin-button { opacity: .4; }
 .vat-box strong { grid-column: 2; font-size: 1.1rem; font-variant-numeric: tabular-nums; }
 .vat-box .btn { grid-column: 3; grid-row: 1 / span 2; }
 .vat-return-note { grid-column: 1 / -1; margin: 0; font-size: .75rem; }
+/* ---------- Filed quarters ---------- */
+.filing { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: .85rem; }
+.filing p { margin: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.filing.filed { padding: 10px 12px; border-radius: var(--radius-sm); background: var(--surface-2); }
+.filing .lock { display: inline-flex; color: var(--accent); }
+.filing-warn { flex-basis: 100%; color: var(--danger); }
+.filing-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.filing-confirm span { flex: 1 1 260px; }
+.filing .btn svg { vertical-align: -2px; margin-right: 4px; }
+.receipt-lock { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; color: var(--muted); }
+.locked-note { margin: 0; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--surface-2); font-size: .85rem; display: flex; gap: 8px; align-items: flex-start; }
+.locked-note svg { flex: none; margin-top: 2px; color: var(--accent); }
 /* ---------- Printable report ---------- */
 .quarter-actions { display: flex; gap: 8px; align-items: center; }
 .report { max-width: 900px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 18px; }

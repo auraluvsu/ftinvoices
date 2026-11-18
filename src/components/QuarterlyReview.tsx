@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import type { Receipt } from '../types';
-import { formatMoney, formatMonthKey } from '../lib/format';
+import { formatDate, formatMoney, formatMonthKey, todayIso } from '../lib/format';
 import { sumTotals } from '../lib/receipts';
 import { categoryBreakdown, groupByQuarter, quarterPeriod, STAGGER_OPTIONS, type QuarterGroup, type QuarterStagger } from '../lib/quarters';
 import type { ExportFormat } from '../lib/export';
 import { ExportMenu } from './ExportMenu';
+import { LockIcon } from './LockIcon';
 import { useAppData } from '../appData';
 import { catVar } from '../lib/color';
 import { box4Text, box7Text, vatReturnBoxes } from '../lib/vatReturn';
@@ -102,6 +103,7 @@ function QuarterCard({
       </div>
 
       <VatReturnStrip receipts={quarter.receipts} />
+      <FilingStatus quarter={quarter} />
 
       <div className="quarter-body">
         <div>
@@ -196,6 +198,86 @@ function VatBox({ box, label, display, copyText }: { box: string; label: string;
       <button type="button" className="btn btn-ghost btn-sm" onClick={copy} aria-label={`Copy ${box}: ${copyText}`}>
         {copied ? 'Copied' : 'Copy'}
       </button>
+    </div>
+  );
+}
+
+/** "Mark as filed" for a finished quarter, or when and what was filed, with Unfile. */
+function FilingStatus({ quarter }: { quarter: QuarterGroup }) {
+  const { filedQuarters, fileQuarter, unfileQuarter } = useAppData();
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const period = quarterPeriod(quarter.start);
+  const filed = filedQuarters.find((f) => f.start === period.from);
+  const boxes = vatReturnBoxes(quarter.receipts);
+  const ended = period.to < todayIso();
+  const n = quarter.receipts.length;
+
+  const run = async (action: () => Promise<boolean>) => {
+    setBusy(true);
+    const ok = await action();
+    setBusy(false);
+    if (ok) setConfirming(false);
+  };
+
+  if (filed) {
+    const changed = filed.box4 !== boxes.box4 || filed.box7 !== boxes.box7;
+    return (
+      <div className="filing filed">
+        <p>
+          <span className="lock" aria-hidden>
+            <LockIcon />
+          </span>
+          <strong>Filed {formatDate(filed.filedAt.slice(0, 10))}</strong>
+          <span className="muted">
+            {' '}
+            · Box 4 {formatMoney(filed.box4)} · Box 7 £{filed.box7.toLocaleString('en-GB')} · receipts locked
+          </span>
+        </p>
+        {changed && (
+          <p className="filing-warn" role="note">
+            The figures now differ from what was filed (Box 4 {formatMoney(boxes.box4)}, Box 7 £{boxes.box7.toLocaleString('en-GB')}).
+          </p>
+        )}
+        {confirming ? (
+          <div className="filing-confirm">
+            <span>Unfile {quarter.label}? Its receipts can be edited again.</span>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setConfirming(false)}>
+              Cancel
+            </button>
+            <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => run(() => unfileQuarter(filed, quarter.label))}>
+              Unfile
+            </button>
+          </div>
+        ) : (
+          <button type="button" className="link-btn" onClick={() => setConfirming(true)}>
+            Unfile
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  if (!ended) return null;
+  return (
+    <div className="filing">
+      {confirming ? (
+        <div className="filing-confirm">
+          <span>
+            Mark {quarter.label} as filed? Its {n} receipt{n === 1 ? '' : 's'} will be locked, and Box 4 and Box 7 saved as they are now.
+          </span>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setConfirming(false)}>
+            Cancel
+          </button>
+          <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => run(() => fileQuarter(period, boxes, quarter.label))}>
+            Mark as filed
+          </button>
+        </div>
+      ) : (
+        <button type="button" className="btn btn-secondary btn-sm" onClick={() => setConfirming(true)}>
+          <LockIcon /> Mark as filed
+        </button>
+      )}
     </div>
   );
 }
