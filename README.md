@@ -54,6 +54,7 @@ The app needs a Supabase project first. See [docs/NEXT-STEPS.md](docs/NEXT-STEPS
 | `npm run build` | Type-check and build to `dist/` |
 | `npm run preview` | Serve the production build locally |
 | `npm run lint` | Lint with oxlint |
+| `npm run gen:types` | Regenerate `src/lib/database.types.ts` from Supabase (set `SUPABASE_PROJECT_REF`, after `npx supabase login`) |
 
 ## Project layout
 
@@ -66,6 +67,7 @@ src/
   components/               form, popups, charts, colour wheel, menus
   lib/
     db.ts                   typed Supabase queries, image storage, scan call
+    database.types.ts       table types for the Supabase client (regenerate after schema changes)
     receipts.ts, quarters.ts  grouping, totals, sorting, search, VAT quarters
     export.ts               xlsx / CSV / JSON export
     color.ts, image.ts, format.ts
