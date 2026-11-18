@@ -4,8 +4,6 @@ import type { Category } from '../types';
 import { dataUrlToBlob } from '../lib/image';
 import * as db from '../lib/db';
 
-const IMAGE_DELETE_DELAY_MS = 8000; // keep the image until the Undo toast is gone
-
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 export interface ReceiptActionDeps {
@@ -134,11 +132,9 @@ export function receiptActions({
       db.deleteReceipts([...ids]).then(
         () => {
           const paths = rows.flatMap((r) => (r.imagePath ? [r.imagePath] : []));
-          const timer = paths.length
-            ? setTimeout(() => db.removeImages(paths).catch(console.error), IMAGE_DELETE_DELAY_MS)
-            : undefined;
+          paths.forEach(scheduleImageDelete);
           notify(`Deleted ${rows.length} receipt${rows.length === 1 ? '' : 's'}`, 'info', async () => {
-            clearTimeout(timer);
+            paths.forEach(cancelImageDelete);
             dismissToast();
             try {
               const restored = await db.restoreReceipts(rows);
