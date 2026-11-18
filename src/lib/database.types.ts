@@ -83,6 +83,7 @@ export type Database = {
           updated_at: string;
           user_id: string;
           vat: number;
+          vat_rate: string;
         };
         Insert: {
           category_id: string;
@@ -96,6 +97,7 @@ export type Database = {
           updated_at?: string;
           user_id?: string;
           vat?: number;
+          vat_rate?: string;
         };
         Update: {
           category_id?: string;
@@ -109,6 +111,7 @@ export type Database = {
           updated_at?: string;
           user_id?: string;
           vat?: number;
+          vat_rate?: string;
         };
         Relationships: [
           {

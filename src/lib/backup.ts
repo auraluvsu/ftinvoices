@@ -2,6 +2,7 @@ import type { Category, Client, Receipt } from '../types';
 import type { QuarterStagger } from './quarters';
 import * as db from './db';
 import { dataUrlToBlob, urlToDataUrl } from './image';
+import { DEFAULT_VAT_RATE, hasNoVat, isVatRate, type VatRate } from './vatRates';
 import { isHex, normaliseHex } from './color';
 
 /** Colour for a category that the backup doesn't give one for (must be a hex for the database). */
@@ -21,6 +22,8 @@ export interface Backup {
     category: string;
     total: number;
     vat: number;
+    /** Added after the first backups; missing means standard rate. */
+    vatRate?: VatRate;
     createdAt: string;
     /** JPEG as a data: URL. */
     image?: string;
@@ -43,6 +46,7 @@ export async function buildBackup(client: Client, categories: Category[], receip
           category: r.category,
           total: r.total,
           vat: r.vat,
+          vatRate: r.vatRate,
           createdAt: new Date(r.createdAt).toISOString(),
           image: r.image ? await urlToDataUrl(r.image) : undefined,
         })),
@@ -84,12 +88,15 @@ export function parseBackup(raw: unknown): Backup {
     if (!isAmount(r.total) || !isAmount(r.vat) || r.vat > r.total) throw new Error(`${where} has invalid amounts`);
     if (r.image !== undefined && (typeof r.image !== 'string' || !r.image.startsWith('data:image/')))
       throw new Error(`${where} has an invalid photo`);
+    const vatRate = isVatRate(r.vatRate) ? r.vatRate : DEFAULT_VAT_RATE;
+    if (hasNoVat(vatRate) && r.vat > 0) throw new Error(`${where} has VAT but is marked as having none`);
     return {
       date: r.date,
       name: r.name.trim(),
       category: typeof r.category === 'string' && r.category.trim() ? r.category.trim() : 'Other',
       total: round2(r.total),
       vat: round2(r.vat),
+      vatRate,
       createdAt: typeof r.createdAt === 'string' ? r.createdAt : new Date().toISOString(),
       image: r.image,
     };
@@ -176,6 +183,7 @@ export async function restoreBackup(
       name: r.name,
       total: r.total,
       vat: r.vat,
+      vatRate: r.vatRate ?? DEFAULT_VAT_RATE,
       date: r.date,
       imagePath,
       createdAt: Date.parse(r.createdAt) || Date.now(),

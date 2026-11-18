@@ -179,6 +179,7 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
       name: draft.name.trim(),
       total: round2(total),
       vat: round2(vat),
+      vatRate: editing?.vatRate ?? 'standard',
       category: finalCategory,
       date: draft.date,
       image: draft.image,

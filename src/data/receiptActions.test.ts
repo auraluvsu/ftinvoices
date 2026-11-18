@@ -26,11 +26,11 @@ const { receiptActions } = await import('./receiptActions');
 
 const fuel: Category = { id: 'c1', clientId: 'k', name: 'Fuel', color: '#ff0000' };
 const shell: StoredReceipt = {
-  id: 'r1', clientId: 'k', categoryId: 'c1', name: 'Shell', total: 60, vat: 10, date: '2026-11-02',
+  id: 'r1', clientId: 'k', categoryId: 'c1', name: 'Shell', total: 60, vat: 10, vatRate: 'standard', date: '2026-11-02',
   imagePath: 'u/k/r1-1.jpg', createdAt: 1, updatedAt: '2026-11-02T10:00:00Z',
 };
 const bp: StoredReceipt = { ...shell, id: 'r2', name: 'BP', imagePath: 'u/k/r2-1.jpg' };
-const draft = { id: 'r1', name: 'Shell', total: 60, vat: 10, category: 'Fuel', date: '2026-11-02', image: 'https://signed' };
+const draft = { id: 'r1', name: 'Shell', total: 60, vat: 10, vatRate: 'standard' as const, category: 'Fuel', date: '2026-11-02', image: 'https://signed' };
 
 function setup() {
   const cats = testState<Category[]>([fuel]);

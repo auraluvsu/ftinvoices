@@ -2,6 +2,7 @@ import { supabase, supabaseKey, supabaseUrl } from './supabase';
 import type { Category, Client, Receipt } from '../types';
 import type { QuarterStagger } from './quarters';
 import type { Tables, TablesUpdate } from './database.types';
+import { DEFAULT_VAT_RATE, isVatRate } from './vatRates';
 
 /** Thin, typed wrappers around Supabase. Every call throws on error. */
 
@@ -14,7 +15,7 @@ type ClientRow = Pick<Tables<'clients'>, 'id' | 'name' | 'vat_number' | 'vat_qua
 type CategoryRow = Pick<Tables<'categories'>, 'id' | 'client_id' | 'name' | 'color'>;
 type ReceiptRow = Pick<
   Tables<'receipts'>,
-  'id' | 'client_id' | 'category_id' | 'name' | 'total' | 'vat' | 'date' | 'image_path' | 'created_at' | 'updated_at'
+  'id' | 'client_id' | 'category_id' | 'name' | 'total' | 'vat' | 'vat_rate' | 'date' | 'image_path' | 'created_at' | 'updated_at'
 >;
 
 const toClient = (r: ClientRow): Client => ({
@@ -35,6 +36,7 @@ export const toStoredReceipt = (r: ReceiptRow): StoredReceipt => ({
   name: r.name,
   total: Number(r.total),
   vat: Number(r.vat),
+  vatRate: isVatRate(r.vat_rate) ? r.vat_rate : DEFAULT_VAT_RATE,
   date: r.date,
   imagePath: r.image_path ?? undefined,
   createdAt: Date.parse(r.created_at),
@@ -48,6 +50,7 @@ const fromStoredReceipt = (r: StoredReceipt) => ({
   name: r.name,
   total: r.total,
   vat: r.vat,
+  vat_rate: r.vatRate,
   date: r.date,
   image_path: r.imagePath ?? null,
 });
@@ -135,7 +138,7 @@ export async function reassignReceipts(clientId: string, fromId: string, toId: s
 }
 
 // ---------- Receipts ----------
-const RECEIPT_COLUMNS = 'id,client_id,category_id,name,total,vat,date,image_path,created_at,updated_at';
+const RECEIPT_COLUMNS = 'id,client_id,category_id,name,total,vat,vat_rate,date,image_path,created_at,updated_at';
 
 export async function listReceipts(clientId: string): Promise<StoredReceipt[]> {
   const rows = check(
@@ -202,9 +205,9 @@ export async function restoreReceipts(rows: StoredReceipt[]): Promise<StoredRece
     await supabase
       .from('receipts')
       .upsert(rows.map(fromStoredReceipt))
-      .select('id,client_id,category_id,name,total,vat,date,image_path,created_at'),
+      .select(RECEIPT_COLUMNS),
   );
-  return (data as ReceiptRow[]).map(toStoredReceipt);
+  return (data ?? []).map(toStoredReceipt);
 }
 
 /** Moves receipts of one client to another of its categories; returns the updated rows. */
@@ -216,9 +219,9 @@ export async function setReceiptsCategory(clientId: string, ids: string[], categ
       .update({ category_id: categoryId })
       .eq('client_id', clientId)
       .in('id', ids)
-      .select('id,client_id,category_id,name,total,vat,date,image_path,created_at'),
+      .select(RECEIPT_COLUMNS),
   );
-  return (data as ReceiptRow[]).map(toStoredReceipt);
+  return (data ?? []).map(toStoredReceipt);
 }
 
 // ---------- Images (private bucket) ----------
