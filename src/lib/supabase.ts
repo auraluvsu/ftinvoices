@@ -10,3 +10,7 @@ export const supabaseConfigured = Boolean(url && anonKey);
 export const supabase: SupabaseClient = createClient(url ?? 'http://localhost', anonKey ?? 'missing', {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
 });
+
+/** Project URL and browser key, for the rare raw fetch (e.g. keepalive requests while the page closes). */
+export const supabaseUrl = url ?? 'http://localhost';
+export const supabaseKey = anonKey ?? 'missing';

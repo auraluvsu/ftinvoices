@@ -47,6 +47,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const client = clients.find((c) => c.id === clientId) ?? null;
   const [categoryList, setCategoryList] = useState<Category[]>([]);
   const [stored, setStored] = useState<db.StoredReceipt[]>([]);
+  /** Images of deleted receipts waiting out the Undo window: path → timer (one mutable Map for the provider's life). */
+  const [pendingDeletes] = useState(() => new Map<string, ReturnType<typeof setTimeout>>());
   const [urls, setUrls] = useState<Map<string, string>>(() => new Map());
   const [toast, setToast] = useState<Toast | null>(null);
   const storedRef = useRef(stored);
@@ -106,6 +108,35 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     },
     [],
   );
+
+  /** Deletes an image after the Undo window, unless cancelImageDelete is called first. */
+  const scheduleImageDelete = useCallback((path: string) => {
+    const timer = setTimeout(() => {
+      pendingDeletes.delete(path);
+      db.removeImages([path]).catch(console.error);
+    }, IMAGE_DELETE_DELAY_MS);
+    pendingDeletes.set(path, timer);
+  }, [pendingDeletes]);
+  const cancelImageDelete = useCallback((path: string) => {
+    clearTimeout(pendingDeletes.get(path));
+    pendingDeletes.delete(path);
+  }, [pendingDeletes]);
+
+  // If the page closes during an Undo window, delete those images now rather than never.
+  useEffect(() => {
+    const pending = pendingDeletes;
+    const flush = () => {
+      if (!pending.size) return;
+      for (const t of pending.values()) clearTimeout(t);
+      db.removeImagesOnExit([...pending.keys()]);
+      pending.clear();
+    };
+    window.addEventListener('pagehide', flush);
+    return () => window.removeEventListener('pagehide', flush);
+  }, [pendingDeletes]);
+
+  // Keep the token handy for keepalive requests sent while the page closes.
+  useEffect(() => db.setAccessToken(session.access_token), [session.access_token]);
 
   useEffect(() => {
     // Initial load from Supabase; state is only set after the awaited network calls.
@@ -286,11 +317,9 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         setStored((prev) => prev.filter((r) => r.id !== row.id));
         db.deleteReceipt(row.id).then(
           () => {
-            const timer = row.imagePath
-              ? setTimeout(() => db.removeImages([row.imagePath!]).catch(console.error), IMAGE_DELETE_DELAY_MS)
-              : undefined;
+            if (row.imagePath) scheduleImageDelete(row.imagePath);
             notify(`Deleted “${row.name}”`, 'info', async () => {
-              clearTimeout(timer);
+              if (row.imagePath) cancelImageDelete(row.imagePath);
               setToast(null);
               try {
                 const restored = await db.upsertReceipt(row);
@@ -317,7 +346,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       },
       notify,
     };
-  }, [client, clients, reload, stored, receipts, categories, categoryList, categoryColor, userId, notify]);
+  }, [client, clients, reload, stored, receipts, categories, categoryList, categoryColor, userId, notify, scheduleImageDelete, cancelImageDelete]);
 
   if (phase.kind !== 'ready' || !value) {
     return (
@@ -338,6 +367,13 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         <ClientSettingsModal
           client={settings === 'edit' ? value.client : null}
           onClose={() => setSettings(null)}
+          onFindUnusedImages={async () => {
+            const used = new Set(stored.flatMap((r) => (r.imagePath ? [r.imagePath] : [])));
+            const all = await db.listImages(`${userId}/${value.client.id}`);
+            // Images waiting out an Undo window aren't "unused" yet.
+            return all.filter((p) => !used.has(p) && !pendingDeletes.has(p));
+          }}
+          onRemoveImages={(paths) => db.removeImages(paths)}
           onSave={async (c) => {
             try {
               if (settings === 'edit') {

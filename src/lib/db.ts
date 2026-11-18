@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { supabase, supabaseKey, supabaseUrl } from './supabase';
 import type { Category, Client, Receipt } from '../types';
 import type { QuarterStagger } from './quarters';
 
@@ -163,6 +163,41 @@ export async function uploadImage(path: string, blob: Blob): Promise<void> {
 export async function removeImages(paths: string[]): Promise<void> {
   if (!paths.length) return;
   check(await supabase.storage.from(BUCKET).remove(paths));
+}
+
+/** Every image path stored under a folder such as `{user}/{client}`. */
+export async function listImages(folder: string): Promise<string[]> {
+  const out: string[] = [];
+  const PAGE = 1000;
+  for (let offset = 0; ; offset += PAGE) {
+    const items = check(await supabase.storage.from(BUCKET).list(folder, { limit: PAGE, offset })) ?? [];
+    // Sub-folders come back with a null id; there shouldn't be any, but skip them.
+    for (const it of items) if (it.id) out.push(`${folder}/${it.name}`);
+    if (items.length < PAGE) return out;
+  }
+}
+
+// The latest access token, kept so images can be deleted while the page is closing,
+// when there's no time to await getSession(). The store keeps it up to date.
+let accessToken: string | null = null;
+export function setAccessToken(token: string | null): void {
+  accessToken = token;
+}
+
+/**
+ * Deletes images with a `keepalive` request, which the browser finishes even after the
+ * page has gone (used on `pagehide`). Fire-and-forget: there's no result to wait for.
+ */
+export function removeImagesOnExit(paths: string[]): void {
+  if (!paths.length || !accessToken) return;
+  void fetch(`${supabaseUrl}/storage/v1/object/${BUCKET}`, {
+    method: 'DELETE',
+    keepalive: true,
+    headers: { apikey: supabaseKey, Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prefixes: paths }),
+  }).catch(() => {
+    /* best effort */
+  });
 }
 
 /** Map of path → signed URL. Missing/failed paths are left out. */
