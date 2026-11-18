@@ -60,12 +60,25 @@ Per-client categories, each with a display colour.
 
 Index: `(client_id, date desc)` for loading a client's receipts newest first.
 
+### `filed_quarters`
+VAT quarters that have been filed with HMRC. Receipts dated inside one are locked.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid | Primary key |
+| `user_id` | uuid | Owner |
+| `client_id` | uuid | Deleted with the client |
+| `period_start`, `period_end` | date | First and last day of the quarter. One row per client and quarter |
+| `filed_at` | timestamptz | When it was marked as filed |
+| `box4`, `box7` | numeric | The Box 4 (VAT reclaimed) and Box 7 (net purchases, whole pounds) figures at the time of filing |
+
 ## Rules the database enforces
 
 - **Category belongs to the same client.** The foreign key `(category_id, client_id) → categories(id, client_id)` means a receipt can't point at another client's category.
 - **Categories in use can't be deleted** (`on delete restrict`). The app's *Merge…* action moves the receipts to another category first, then deletes it.
 - **Deleting a client deletes its categories and receipts** (`on delete cascade`). Image files aren't covered by that, so the app's *Delete client* empties the client's storage folder first.
 - **Sensible amounts**: totals and VAT can't be negative, and VAT can't exceed the total.
+- **Filed quarters are locked**: the `receipts_filed_guard` trigger rejects adding, deleting or changing the name, amounts, VAT rate, date or photo of a receipt dated inside a filed quarter (moving it into or out of one by date included). Changing its category is allowed, so category merges still work, and deleting the whole client still deletes everything.
 - **No VAT on zero-rated, exempt or outside-the-scope receipts**: `vat` must be 0 unless `vat_rate` is `standard` or `reduced`.
 
 ## Triggers
@@ -74,13 +87,14 @@ Index: `(client_id, date desc)` for loading a client's receipts newest first.
 |---|---|---|
 | `clients_seed` | After a client is created | Adds the 8 default categories with their colours: Equipment `#2f5bd3`, Fuel `#e3120b`, Meals & entertainment `#d1149a`, Office supplies `#00b4d8`, Software & subscriptions `#b8860b`, Travel `#ffffff`, Utilities `#228b22`, Other `#ff8c00` |
 | `receipts_touch` | Before a receipt is updated | Sets `updated_at` to now |
+| `receipts_filed_guard` | Before a receipt is added, changed or deleted | Blocks the change if the receipt is (or would be) in a filed quarter; see above |
 
 ## Row-level security
 
-RLS is enabled on all three tables, so every query only sees rows owned by the signed-in user:
+RLS is enabled on every table, so every query only sees rows owned by the signed-in user:
 
 - `clients`: `user_id = auth.uid()` for reading and writing.
-- `categories` and `receipts`: `user_id = auth.uid()`, and on insert/update the `client_id` must be one of the user's own clients.
+- `categories`, `receipts` and `filed_quarters`: `user_id = auth.uid()`, and on insert/update the `client_id` must be one of the user's own clients.
 
 Signed-out requests (publishable key with no session) see nothing.
 
