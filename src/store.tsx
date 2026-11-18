@@ -50,6 +50,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const [urls, setUrls] = useState<Map<string, string>>(() => new Map());
   const [toast, setToast] = useState<Toast | null>(null);
   const storedRef = useRef(stored);
+  /** Images of deleted receipts waiting out the Undo window: path → timer (one mutable Map for the provider's life). */
+  const [pendingDeletes] = useState(() => new Map<string, ReturnType<typeof setTimeout>>());
   useEffect(() => {
     storedRef.current = stored;
   }, [stored]);
@@ -110,6 +112,32 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     // oxlint-disable-next-line react/set-state-in-effect
     void fetchBooks();
   }, [fetchBooks]);
+
+  /** Deletes an image after the Undo window, unless cancelImageDelete is called first. */
+  const scheduleImageDelete = useCallback((path: string) => {
+    const timer = setTimeout(() => {
+      pendingDeletes.delete(path);
+      db.removeImages([path]).catch(console.error);
+    }, IMAGE_DELETE_DELAY_MS);
+    pendingDeletes.set(path, timer);
+  }, [pendingDeletes]);
+  const cancelImageDelete = useCallback((path: string) => {
+    clearTimeout(pendingDeletes.get(path));
+    pendingDeletes.delete(path);
+  }, [pendingDeletes]);
+
+  // If the page closes during an Undo window, delete those images now rather than never.
+  useEffect(() => {
+    const pending = pendingDeletes;
+    const flush = () => {
+      if (!pending.size) return;
+      for (const t of pending.values()) clearTimeout(t);
+      db.removeImagesOnExit([...pending.keys()]);
+      pending.clear();
+    };
+    window.addEventListener('pagehide', flush);
+    return () => window.removeEventListener('pagehide', flush);
+  }, [pendingDeletes]);
 
   // Signed URLs expire; refresh them periodically while the app stays open.
   useEffect(() => {
@@ -270,11 +298,9 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         setStored((prev) => prev.filter((r) => r.id !== row.id));
         db.deleteReceipt(row.id).then(
           () => {
-            const timer = row.imagePath
-              ? setTimeout(() => db.removeImages([row.imagePath!]).catch(console.error), IMAGE_DELETE_DELAY_MS)
-              : undefined;
+            if (row.imagePath) scheduleImageDelete(row.imagePath);
             notify(`Deleted “${row.name}”`, 'info', async () => {
-              clearTimeout(timer);
+              if (row.imagePath) cancelImageDelete(row.imagePath);
               setToast(null);
               try {
                 const restored = await db.upsertReceipt(row);
@@ -301,7 +327,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       },
       notify,
     };
-  }, [client, clients, reload, stored, receipts, categories, categoryList, categoryColor, userId, notify]);
+  }, [client, clients, reload, stored, receipts, categories, categoryList, categoryColor, userId, notify, scheduleImageDelete, cancelImageDelete]);
 
   if (phase.kind !== 'ready' || !value) {
     return (
