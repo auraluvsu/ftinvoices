@@ -8,15 +8,20 @@ const reply = (body: unknown, stop_reason = 'end_turn'): ScanResponse => ({
   content: [{ type: 'text', text: typeof body === 'string' ? body : JSON.stringify(body) }],
 });
 
-function setup(opts: { apiKey?: string | undefined; send?: CreateMessage } = {}) {
+function setup(opts: { apiKey?: string | undefined; send?: CreateMessage; signedIn?: boolean | Error } = {}) {
   const send = vi.fn<CreateMessage>(opts.send ?? (async () => reply({ name: 'Shell', total: 60, vat: 10, date: '2026-11-02', category: 'Fuel' })));
   const log = vi.fn();
+  const authenticate = vi.fn(async () => {
+    if (opts.signedIn instanceof Error) throw opts.signedIn;
+    return opts.signedIn ?? true;
+  });
   const handler = createHandler({
+    authenticate,
     apiKey: () => ('apiKey' in opts ? opts.apiKey : 'sk-ant-test'),
     createMessage: () => send,
     log,
   });
-  return { handler, send, log };
+  return { handler, send, log, authenticate };
 }
 
 const post = (body: unknown) =>
@@ -74,6 +79,37 @@ describe('scan-receipt handler: requests', () => {
     expect(status).toBe(500);
     expect(body.error).toMatch(/ANTHROPIC_API_KEY/);
     expect(send).not.toHaveBeenCalled();
+  });
+});
+
+describe('scan-receipt handler: sign-in', () => {
+  it('rejects a caller who is not signed in, before reading the body or calling Claude', async () => {
+    const { handler, send } = setup({ signedIn: false });
+    const { status, body } = await call(handler, post(valid));
+    expect(status).toBe(401);
+    expect(body.error).toBe('Sign in to scan receipts');
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('treats an error while checking sign-in as signed out, and logs it', async () => {
+    const err = new Error('auth server down');
+    const { handler, log, send } = setup({ signedIn: err });
+    expect((await call(handler, post(valid))).status).toBe(401);
+    expect(log).toHaveBeenCalledWith(err);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('passes the request to authenticate', async () => {
+    const { handler, authenticate } = setup();
+    const req = post(valid);
+    await handler(req);
+    expect(authenticate).toHaveBeenCalledWith(req);
+  });
+
+  it('lets CORS preflight through without signing in', async () => {
+    const { handler, authenticate } = setup({ signedIn: false });
+    expect((await call(handler, new Request('https://x/', { method: 'OPTIONS' }))).status).toBe(200);
+    expect(authenticate).not.toHaveBeenCalled();
   });
 });
 
