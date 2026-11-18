@@ -70,6 +70,7 @@ export function receiptActions({
           name: draft.name,
           total: draft.total,
           vat: draft.vat,
+          vatRate: draft.vatRate,
           date: draft.date,
           imagePath,
           createdAt: existing?.createdAt ?? Date.now(),

@@ -15,7 +15,7 @@ const { categoryActions } = await import('./categoryActions');
 
 const fuel: Category = { id: 'c1', clientId: 'k', name: 'Fuel', color: '#ff0000' };
 const travel: Category = { id: 'c2', clientId: 'k', name: 'Travel', color: '#00ff00' };
-const receipt = { id: 'r1', clientId: 'k', categoryId: 'c1', name: 'Shell', total: 60, vat: 10, date: '2026-11-02', createdAt: 1 } as StoredReceipt;
+const receipt = { id: 'r1', clientId: 'k', categoryId: 'c1', name: 'Shell', total: 60, vat: 10, vatRate: 'standard', date: '2026-11-02', createdAt: 1 } as StoredReceipt;
 
 function setup() {
   const cats = testState<Category[]>([fuel, travel]);

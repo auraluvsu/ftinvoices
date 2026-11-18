@@ -12,9 +12,9 @@ import { ImageInput } from './ImageInput';
 import { CategoryColorPicker } from './CategoryColorPicker';
 import { ScanUnavailableError } from '../lib/db';
 import { markScanUnavailable, scanAvailable } from '../lib/scanAvailability';
+import { DEFAULT_VAT_RATE, hasNoVat, VAT_RATES, vatFromGross, vatRateInfo, type VatRate } from '../lib/vatRates';
 
 const NEW_CATEGORY = '__new__';
-const UK_VAT_RATE = 0.2;
 
 interface Props {
   categories: string[];
@@ -28,6 +28,7 @@ interface Draft {
   name: string;
   total: string;
   vat: string;
+  vatRate: VatRate;
   category: string;
   newCategory: string;
   newColor: string;
@@ -39,6 +40,7 @@ const blank = (category = ''): Draft => ({
   name: '',
   total: '',
   vat: '',
+  vatRate: DEFAULT_VAT_RATE,
   category,
   newCategory: '',
   newColor: '',
@@ -50,6 +52,7 @@ const fromReceipt = (r: Receipt): Draft => ({
   name: r.name,
   total: r.total.toFixed(2),
   vat: r.vat.toFixed(2),
+  vatRate: r.vatRate,
   category: r.category,
   newCategory: '',
   newColor: '',
@@ -75,6 +78,7 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
     [suppliers],
   );
   const [categoryTouched, setCategoryTouched] = useState(Boolean(editing));
+  const [rateTouched, setRateTouched] = useState(Boolean(editing));
   const [remembered, setRemembered] = useState<string | null>(null);
   const listId = useId();
 
@@ -125,6 +129,8 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
     } else if (!hit) {
       setRemembered(null);
     }
+    // Same supplier, same VAT treatment (e.g. train tickets are zero-rated).
+    if (hit && !rateTouched && hit.vatRate !== draft.vatRate) changeRate(hit.vatRate);
   };
   // Default a new category to the first suggested colour not already in use.
   const usedColors = new Set(categories.map(categoryColor));
@@ -146,16 +152,26 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
       setErrors((e) => ({ ...e, total: 'Enter a total first' }));
       return;
     }
-    // VAT portion of a VAT-inclusive total at 20% = total × 20/120
-    set('vat', round2((t * UK_VAT_RATE) / (1 + UK_VAT_RATE)).toFixed(2));
+    // VAT portion of a VAT-inclusive total, e.g. at 20% = total × 20/120
+    set('vat', vatFromGross(t, draft.vatRate).toFixed(2));
   };
+
+  /** Switching rate keeps VAT consistent: 0 for no-VAT rates, recalculated if it was calculated before. */
+  const changeRate = (rate: VatRate) => {
+    const t = Number(draft.total);
+    const wasCalculated = draft.total !== '' && !isNaN(t) && Number(draft.vat) === vatFromGross(t, draft.vatRate);
+    set('vatRate', rate);
+    if (hasNoVat(rate)) set('vat', '0.00');
+    else if (wasCalculated || hasNoVat(draft.vatRate)) set('vat', draft.total !== '' && !isNaN(t) ? vatFromGross(t, rate).toFixed(2) : '');
+  };
+  const noVat = hasNoVat(draft.vatRate);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (saving) return;
     const errs: typeof errors = {};
     const total = Number(draft.total);
-    const vat = draft.vat.trim() === '' ? 0 : Number(draft.vat);
+    const vat = noVat || draft.vat.trim() === '' ? 0 : Number(draft.vat);
     const isNew = currentCategory === NEW_CATEGORY;
     const category = (isNew ? draft.newCategory : currentCategory).trim();
 
@@ -179,6 +195,7 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
       name: draft.name.trim(),
       total: round2(total),
       vat: round2(vat),
+      vatRate: draft.vatRate,
       category: finalCategory,
       date: draft.date,
       image: draft.image,
@@ -199,6 +216,7 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
       // Keep the category and date — handy when entering a batch of receipts.
       setDraft((d) => ({ ...blank(finalCategory), date: d.date }));
       setCategoryTouched(false);
+      setRateTouched(false);
       setRemembered(null);
     }
   };
@@ -255,9 +273,16 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
           error={errors.vat}
           highlight={scanned.has('vat')}
           action={
-            <button type="button" className="link-btn" onClick={calcVat} title="Calculate 20% VAT from the total">
-              Calc 20%
-            </button>
+            !noVat && (
+              <button
+                type="button"
+                className="link-btn"
+                onClick={calcVat}
+                title={`Calculate ${vatRateInfo(draft.vatRate).short} VAT from the total`}
+              >
+                Calc {vatRateInfo(draft.vatRate).short}
+              </button>
+            )
           }
         >
           <div className="money-input">
@@ -267,13 +292,31 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
               inputMode="decimal"
               step="0.01"
               min="0"
-              value={draft.vat}
+              value={noVat ? '0.00' : draft.vat}
               onChange={(e) => set('vat', e.target.value)}
               placeholder="0.00"
+              disabled={noVat}
+              title={noVat ? 'No VAT at this rate' : undefined}
             />
           </div>
         </Field>
       </div>
+
+      <Field label="VAT rate">
+        <select
+          value={draft.vatRate}
+          onChange={(e) => {
+            changeRate(e.target.value as VatRate);
+            setRateTouched(true);
+          }}
+        >
+          {VAT_RATES.map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.label}
+            </option>
+          ))}
+        </select>
+      </Field>
 
       <div className="row-2">
         <Field label="Category" error={errors.category} highlight={scanned.has('category')}>

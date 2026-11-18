@@ -1,4 +1,5 @@
 import type { QuarterStagger } from './lib/quarters';
+import type { VatRate } from './lib/vatRates';
 
 export interface Receipt {
   id: string;
@@ -11,6 +12,8 @@ export interface Receipt {
   total: number;
   /** VAT amount */
   vat: number;
+  /** How VAT applies (20%, 5%, zero-rated, …) */
+  vatRate: VatRate;
   /** ISO date, YYYY-MM-DD */
   date: string;
   /** Path of the image in the private 'receipts' storage bucket */
@@ -28,6 +31,7 @@ export interface ReceiptDraft {
   name: string;
   total: number;
   vat: number;
+  vatRate: VatRate;
   category: string;
   date: string;
   /** Unchanged display URL, a new `data:` URL to upload, or undefined for no image */
@@ -65,6 +69,7 @@ export interface MonthFilters {
   dateFrom: string;
   dateTo: string;
   categories: string[];
+  vatRates: VatRate[];
 }
 
 export const emptyFilters: MonthFilters = {
@@ -75,6 +80,7 @@ export const emptyFilters: MonthFilters = {
   dateFrom: '',
   dateTo: '',
   categories: [],
+  vatRates: [],
 };
 
 export type Theme = 'system' | 'light' | 'dark';

@@ -1,5 +1,6 @@
 import type { MonthFilters, Receipt, SortDir, SortField } from '../types';
 import { monthKey } from './format';
+import type { VatRate } from './vatRates';
 
 export interface MonthGroup {
   key: string; // YYYY-MM
@@ -45,6 +46,7 @@ export function applyFilters(receipts: Receipt[], f: MonthFilters): Receipt[] {
     if (f.dateFrom && r.date < f.dateFrom) return false;
     if (f.dateTo && r.date > f.dateTo) return false;
     if (f.categories.length && !f.categories.includes(r.category)) return false;
+    if (f.vatRates.length && !f.vatRates.includes(r.vatRate)) return false;
     return true;
   });
 }
@@ -74,7 +76,9 @@ export function sortReceipts(receipts: Receipt[], field: SortField, dir: SortDir
 export function activeFilterCount(f: MonthFilters): number {
   return (
     [f.minTotal, f.maxTotal, f.minVat, f.maxVat, f.dateFrom, f.dateTo].filter((v) => v !== '')
-      .length + (f.categories.length ? 1 : 0)
+      .length +
+    (f.categories.length ? 1 : 0) +
+    (f.vatRates.length ? 1 : 0)
   );
 }
 
@@ -105,6 +109,8 @@ export interface Supplier {
   name: string;
   /** Category used on the most recent receipt from this supplier */
   category: string;
+  /** VAT rate on the most recent receipt from this supplier */
+  vatRate: VatRate;
   count: number;
 }
 
@@ -115,7 +121,7 @@ export function supplierMemory(receipts: Receipt[]): Map<string, Supplier> {
   for (const r of sorted) {
     const key = r.name.trim().toLowerCase();
     if (!key) continue;
-    map.set(key, { name: r.name.trim(), category: r.category, count: (map.get(key)?.count ?? 0) + 1 });
+    map.set(key, { name: r.name.trim(), category: r.category, vatRate: r.vatRate, count: (map.get(key)?.count ?? 0) + 1 });
   }
   return map;
 }
