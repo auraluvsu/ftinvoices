@@ -6,6 +6,7 @@ import { VAT_RATES, vatRateInfo, type VatRate } from '../lib/vatRates';
 import type { ExportFormat } from '../lib/export';
 import { ExportMenu } from './ExportMenu';
 import { useAppData } from '../appData';
+import { LockIcon } from './LockIcon';
 import { catVar } from '../lib/color';
 
 interface Props {
@@ -39,7 +40,7 @@ export function MonthSection({
   onExport,
   selection,
 }: Props) {
-  const { categoryColor } = useAppData();
+  const { categoryColor, lockedBy } = useAppData();
   const [open, setOpen] = useState(defaultOpen);
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
@@ -256,11 +257,17 @@ export function MonthSection({
                         <path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4" />
                       </svg>
                     </button>
-                    <button type="button" className="btn btn-ghost btn-icon danger" onClick={() => onDelete(r)} aria-label={`Delete ${r.name}`} title="Delete">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                        <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
-                      </svg>
-                    </button>
+                    {lockedBy(r.date) ? (
+                      <span className="receipt-lock" title="In a filed VAT quarter" aria-label={`${r.name} is in a filed VAT quarter`} role="img">
+                        <LockIcon size={15} />
+                      </span>
+                    ) : (
+                      <button type="button" className="btn btn-ghost btn-icon danger" onClick={() => onDelete(r)} aria-label={`Delete ${r.name}`} title="Delete">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                          <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
+                        </svg>
+                      </button>
+                    )}
                   </div>
                 </li>
               ))}
