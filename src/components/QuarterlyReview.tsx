@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import type { Receipt } from '../types';
 import { formatMoney, formatMonthKey } from '../lib/format';
 import { sumTotals } from '../lib/receipts';
-import { categoryBreakdown, groupByQuarter, STAGGER_OPTIONS, type QuarterGroup, type QuarterStagger } from '../lib/quarters';
+import { categoryBreakdown, groupByQuarter, quarterPeriod, STAGGER_OPTIONS, type QuarterGroup, type QuarterStagger } from '../lib/quarters';
 import type { ExportFormat } from '../lib/export';
 import { ExportMenu } from './ExportMenu';
 import { useAppData } from '../appData';
@@ -42,14 +42,8 @@ export function QuarterlyReview({ receipts, stagger, onEditSettings, onExport }:
 
 /** Link to the printable report covering a quarter's three months. */
 function reportLink(q: QuarterGroup): string {
-  const [y, m] = q.months[2].key.split('-').map(Number);
-  const lastDay = new Date(y, m, 0).getDate();
-  const params = new URLSearchParams({
-    from: `${q.months[0].key}-01`,
-    to: `${q.months[2].key}-${String(lastDay).padStart(2, '0')}`,
-    title: `VAT quarter ${q.label}`,
-  });
-  return `/report?${params}`;
+  const { from, to } = quarterPeriod(q.start);
+  return `/report?${new URLSearchParams({ from, to, title: `VAT quarter ${q.label}` })}`;
 }
 
 function QuarterCard({

@@ -52,6 +52,20 @@ export interface Client {
   stagger: QuarterStagger;
 }
 
+/** A VAT quarter marked as filed; receipts dated inside it are locked. */
+export interface FiledQuarter {
+  id: string;
+  clientId: string;
+  /** First and last day of the quarter, YYYY-MM-DD */
+  start: string;
+  end: string;
+  /** ISO timestamp */
+  filedAt: string;
+  /** Box 4 and Box 7 as filed */
+  box4: number;
+  box7: number;
+}
+
 /** A category created while saving a receipt. */
 export interface NewCategory {
   name: string;

@@ -1,5 +1,5 @@
 import { supabase, supabaseKey, supabaseUrl } from './supabase';
-import type { Category, Client, Receipt } from '../types';
+import type { Category, Client, FiledQuarter, Receipt } from '../types';
 import type { QuarterStagger } from './quarters';
 import type { Tables, TablesUpdate } from './database.types';
 import { DEFAULT_VAT_RATE, isVatRate } from './vatRates';
@@ -222,6 +222,43 @@ export async function setReceiptsCategory(clientId: string, ids: string[], categ
       .select(RECEIPT_COLUMNS),
   );
   return (data ?? []).map(toStoredReceipt);
+}
+
+// ---------- Filed VAT quarters ----------
+type FiledRow = Pick<Tables<'filed_quarters'>, 'id' | 'client_id' | 'period_start' | 'period_end' | 'filed_at' | 'box4' | 'box7'>;
+const FILED_COLUMNS = 'id,client_id,period_start,period_end,filed_at,box4,box7';
+const toFiled = (r: FiledRow): FiledQuarter => ({
+  id: r.id,
+  clientId: r.client_id,
+  start: r.period_start,
+  end: r.period_end,
+  filedAt: r.filed_at,
+  box4: Number(r.box4),
+  box7: Number(r.box7),
+});
+
+export async function listFiledQuarters(clientId: string): Promise<FiledQuarter[]> {
+  const rows = check(await supabase.from('filed_quarters').select(FILED_COLUMNS).eq('client_id', clientId).order('period_start'));
+  return (rows ?? []).map(toFiled);
+}
+
+export async function fileQuarter(
+  clientId: string,
+  period: { from: string; to: string },
+  boxes: { box4: number; box7: number },
+): Promise<FiledQuarter> {
+  const row = checkRow(
+    await supabase
+      .from('filed_quarters')
+      .insert({ client_id: clientId, period_start: period.from, period_end: period.to, ...boxes })
+      .select(FILED_COLUMNS)
+      .single(),
+  );
+  return toFiled(row);
+}
+
+export async function unfileQuarter(id: string): Promise<void> {
+  check(await supabase.from('filed_quarters').delete().eq('id', id));
 }
 
 // ---------- Images (private bucket) ----------
