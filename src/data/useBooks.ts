@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { Category, Client } from '../types';
+import type { Category, Client, FiledQuarter } from '../types';
 import * as db from '../lib/db';
 
 export type Phase = { kind: 'loading' } | { kind: 'error'; message: string } | { kind: 'no-client' } | { kind: 'ready' };
@@ -35,6 +35,7 @@ export function useBooks(onSigned: (urls: Map<string, string>) => void) {
   const [clientId, setClientId] = useState<string | null>(null);
   const [categoryList, setCategoryList] = useState<Category[]>([]);
   const [stored, setStored] = useState<db.StoredReceipt[]>([]);
+  const [filed, setFiled] = useState<FiledQuarter[]>([]);
   const client = clients.find((c) => c.id === clientId) ?? null;
 
   /** Fetches everything, then applies it in one go (state is only set after the network calls). */
@@ -46,13 +47,18 @@ export function useBooks(onSigned: (urls: Map<string, string>) => void) {
         if (!all.length) return setPhase({ kind: 'no-client' });
         const want = preferredId ?? readClientId();
         const c = all.find((x) => x.id === want) ?? all[0];
-        const [cats, recs] = await Promise.all([db.listCategories(c.id), db.listReceipts(c.id)]);
+        const [cats, recs, fq] = await Promise.all([
+          db.listCategories(c.id),
+          db.listReceipts(c.id),
+          db.listFiledQuarters(c.id),
+        ]);
         const signed = await db.signImages(recs.flatMap((r) => (r.imagePath ? [r.imagePath] : [])));
         saveClientId(c.id);
         setClients(all);
         setClientId(c.id);
         setCategoryList(cats);
         setStored(recs);
+        setFiled(fq);
         onSigned(signed);
         setPhase({ kind: 'ready' });
       } catch (e) {
@@ -91,5 +97,5 @@ export function useBooks(onSigned: (urls: Map<string, string>) => void) {
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [phase.kind, reload, clientId]);
 
-  return { phase, clients, setClients, client, categoryList, setCategoryList, stored, setStored, reload };
+  return { phase, clients, setClients, client, categoryList, setCategoryList, stored, setStored, filed, setFiled, reload };
 }

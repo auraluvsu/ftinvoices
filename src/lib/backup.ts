@@ -121,13 +121,20 @@ export interface RestorePlan {
   add: Backup['receipts'];
   /** Receipts skipped because the target already has them. */
   skipped: number;
+  /** Receipts skipped because their date is in one of the target's filed VAT quarters. */
+  locked: number;
 }
 
 /** What restoring into a client that already has `existing` receipts would do. */
-export function planRestore(backup: Backup, existing: Pick<Receipt, 'date' | 'name' | 'total'>[]): RestorePlan {
+export function planRestore(
+  backup: Backup,
+  existing: Pick<Receipt, 'date' | 'name' | 'total'>[],
+  isLocked: (date: string) => boolean = () => false,
+): RestorePlan {
   const have = new Set(existing.map(receiptKey));
-  const add = backup.receipts.filter((r) => !have.has(receiptKey(r)));
-  return { add, skipped: backup.receipts.length - add.length };
+  const missing = backup.receipts.filter((r) => !have.has(receiptKey(r)));
+  const add = missing.filter((r) => !isLocked(r.date));
+  return { add, skipped: backup.receipts.length - missing.length, locked: missing.length - add.length };
 }
 
 /**

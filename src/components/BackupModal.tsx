@@ -12,7 +12,7 @@ type Stage =
 
 /** Back up the open client to a file, or restore a backup file into a new or the open client. */
 export function BackupModal({ onClose }: { onClose: () => void }) {
-  const { client, categoryList, receipts, switchClient, reloadBooks, notify } = useAppData();
+  const { client, categoryList, receipts, switchClient, reloadBooks, notify, lockedBy } = useAppData();
   const { session } = useAuth();
   const [backingUp, setBackingUp] = useState(false);
   const [stage, setStage] = useState<Stage>({ kind: 'idle' });
@@ -44,7 +44,11 @@ export function BackupModal({ onClose }: { onClose: () => void }) {
   };
 
   const ready = stage.kind === 'ready' ? stage : null;
-  const plan = ready ? planRestore(ready.backup, target === 'current' ? receipts : []) : null;
+  const plan = ready
+    ? target === 'current'
+      ? planRestore(ready.backup, receipts, (date) => Boolean(lockedBy(date)))
+      : planRestore(ready.backup, [])
+    : null;
 
   const restore = async () => {
     if (!ready || !plan) return;
@@ -56,7 +60,7 @@ export function BackupModal({ onClose }: { onClose: () => void }) {
       notify(
         target === 'new'
           ? `Restored “${ready.backup.client.name}” with ${plan.add.length} receipts`
-          : `Added ${plan.add.length} receipts to “${client.name}”${plan.skipped ? ` (${plan.skipped} already there)` : ''}`,
+          : `Added ${plan.add.length} receipts to “${client.name}”${plan.skipped ? ` (${plan.skipped} already there)` : ''}${plan.locked ? ` (${plan.locked} in filed quarters left out)` : ''}`,
       );
       onClose();
       if (target === 'new') switchClient(id);
@@ -126,7 +130,8 @@ export function BackupModal({ onClose }: { onClose: () => void }) {
               </fieldset>
               <p className="field-hint" role="status">
                 {plan.add.length} receipt{plan.add.length === 1 ? '' : 's'} will be added
-                {plan.skipped > 0 && `; ${plan.skipped} already in ${client.name} will be skipped`}.
+                {plan.skipped > 0 && `; ${plan.skipped} already in ${client.name} will be skipped`}
+                {plan.locked > 0 && `; ${plan.locked} dated in filed VAT quarters will be left out`}.
               </p>
             </>
           )}

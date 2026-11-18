@@ -14,6 +14,8 @@ import { useToasts } from './data/useToasts';
 import { useBooks } from './data/useBooks';
 import { categoryActions } from './data/categoryActions';
 import { receiptActions } from './data/receiptActions';
+import { filedActions } from './data/filedActions';
+import { filedQuarterFor } from './lib/filedQuarters';
 import { useReceiptImages, useResignImages } from './data/useReceiptImages';
 
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -28,8 +30,9 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const { urls, replaceUrls, mergeUrls, showLocal, scheduleImageDelete, cancelImageDelete, isPendingDelete } =
     useReceiptImages(session.access_token);
   const { toast, notify, dismiss: dismissToast } = useToasts();
-  const { phase, clients, setClients, client, categoryList, setCategoryList, stored, setStored, reload } =
+  const { phase, clients, setClients, client, categoryList, setCategoryList, stored, setStored, filed, setFiled, reload } =
     useBooks(replaceUrls);
+  const lockedBy = useCallback((date: string) => filedQuarterFor(date, filed), [filed]);
 
   const createClient = useCallback(
     async (c: Omit<Client, 'id'>) => {
@@ -107,7 +110,11 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         showLocal,
         scheduleImageDelete,
         cancelImageDelete,
+        lockedBy,
       }),
+      filedQuarters: filed,
+      lockedBy,
+      ...filedActions({ clientId: client.id, setFiled, notify }),
 
       exportList: async (list, format, label) => {
         try {
@@ -119,7 +126,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       },
       notify,
     };
-  }, [client, clients, reload, stored, receipts, categories, categoryList, categoryColor, userId, notify, dismissToast, setStored, setCategoryList, scheduleImageDelete, cancelImageDelete, showLocal]);
+  }, [client, clients, reload, stored, receipts, categories, categoryList, categoryColor, userId, notify, dismissToast, setStored, setCategoryList, scheduleImageDelete, cancelImageDelete, showLocal, filed, setFiled, lockedBy]);
 
   if (phase.kind !== 'ready' || !value) {
     return (

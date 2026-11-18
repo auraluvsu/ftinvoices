@@ -48,6 +48,11 @@ function setup() {
     showLocal: vi.fn(),
     scheduleImageDelete: vi.fn(),
     cancelImageDelete: vi.fn(),
+    lockedBy: vi.fn((date: string) =>
+      date >= '2026-07-01' && date <= '2026-09-30'
+        ? { id: 'f', clientId: 'k', start: '2026-07-01', end: '2026-09-30', filedAt: '2026-10-20T09:00:00Z', box4: 0, box7: 0 }
+        : undefined,
+    ),
   };
   return { cats, recs, deps, actions: receiptActions(deps) };
 }
@@ -101,6 +106,26 @@ describe('receiptActions', () => {
     await undo();
     expect(deps.cancelImageDelete.mock.calls.map((c) => c[0])).toEqual([shell.imagePath, bp.imagePath]);
     expect(recs.get()).toHaveLength(2);
+  });
+
+  it('refuses to edit a receipt in a filed quarter, or move one into it', async () => {
+    const { deps, actions } = setup();
+    await expect(actions.saveReceipt({ ...draft, date: '2026-08-01' })).resolves.toBe(false);
+    expect(deps.notify).toHaveBeenCalledWith(expect.stringMatching(/filed on 20 Oct 2026/), 'error');
+    expect(db.updateReceipt).not.toHaveBeenCalled();
+  });
+
+  it('bulk delete skips receipts in filed quarters', async () => {
+    const old = { ...bp, id: 'r3', date: '2026-08-01' };
+    const { recs, deps } = setup();
+    recs.set((prev) => [...prev, old]);
+    const actions = receiptActions({ ...deps, stored: recs.get() });
+    db.deleteReceipts.mockResolvedValue(undefined);
+    actions.deleteReceipts([shell, old] as never);
+    await flush();
+    expect(db.deleteReceipts).toHaveBeenCalledWith(['r1']);
+    expect(recs.get().map((r) => r.id)).toEqual(['r2', 'r3']);
+    expect(deps.notify.mock.calls[0][0]).toBe('Deleted 1 receipt (1 in filed quarters kept)');
   });
 
   it('puts receipts back if a bulk delete fails', async () => {

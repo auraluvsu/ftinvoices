@@ -9,6 +9,7 @@ import { urlToDataUrl } from '../lib/image';
 import { scanReceipt } from '../lib/db';
 import { mergeScan } from '../lib/scan';
 import { ImageInput } from './ImageInput';
+import { LockIcon } from './LockIcon';
 import { CategoryColorPicker } from './CategoryColorPicker';
 import { ScanUnavailableError } from '../lib/db';
 import { markScanUnavailable, scanAvailable } from '../lib/scanAvailability';
@@ -69,7 +70,9 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
   // button's click and the form's submit happen in the same tick, before state would update.
   const [duplicateOf, setDuplicateOf] = useState<Receipt | null>(null);
   const allowDuplicate = useRef(false);
-  const { categoryColor, receipts } = useAppData();
+  const { categoryColor, receipts, lockedBy } = useAppData();
+  // A receipt in a filed VAT quarter is shown read-only.
+  const lock = editing ? lockedBy(editing.date) : undefined;
   // Supplier memory: typing a known name picks the category last used for it,
   // unless the category has been chosen by hand.
   const suppliers = useMemo(() => supplierMemory(receipts), [receipts]);
@@ -181,6 +184,7 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
     else if (!errs.total && vat > total) errs.vat = 'VAT can’t exceed the total';
     if (!category) errs[isNew ? 'newCategory' : 'category'] = 'Required';
     if (!draft.date) errs.date = 'Required';
+    else if (lockedBy(draft.date)) errs.date = 'That’s in a filed VAT quarter';
 
     if (Object.keys(errs).length) {
       setErrors(errs);
@@ -232,142 +236,155 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
         )}
       </div>
 
-      <Field label="Name" error={errors.name} highlight={scanned.has('name')}>
-        <input
-          type="text"
-          value={draft.name}
-          onChange={(e) => onNameChange(e.target.value)}
-          placeholder="e.g. Tesco, Train to Leeds"
-          autoComplete="off"
-          list={listId}
-        />
-        <datalist id={listId}>
-          {supplierList.map((sup) => (
-            <option key={sup.name} value={sup.name} />
-          ))}
-        </datalist>
-        {remembered && (
-          <span className="field-hint">
-            Category set to <strong>{remembered}</strong> from your last receipt
+      {lock && (
+        <p className="locked-note">
+          <LockIcon />
+          <span>
+            This receipt is in a VAT quarter filed on {formatDate(lock.filedAt.slice(0, 10))}, so it can’t be changed. To edit it,
+            unfile the quarter in the quarterly review.
           </span>
-        )}
-      </Field>
+        </p>
+      )}
 
-      <div className="row-2">
-        <Field label="Total (inc. VAT)" error={errors.total} highlight={scanned.has('total')}>
-          <div className="money-input">
-            <span>£</span>
-            <input
-              type="number"
-              inputMode="decimal"
-              step="0.01"
-              min="0"
-              value={draft.total}
-              onChange={(e) => set('total', e.target.value)}
-              placeholder="0.00"
-            />
-          </div>
-        </Field>
-        <Field
-          label="VAT"
-          error={errors.vat}
-          highlight={scanned.has('vat')}
-          action={
-            !noVat && (
-              <button
-                type="button"
-                className="link-btn"
-                onClick={calcVat}
-                title={`Calculate ${vatRateInfo(draft.vatRate).short} VAT from the total`}
-              >
-                Calc {vatRateInfo(draft.vatRate).short}
-              </button>
-            )
-          }
-        >
-          <div className="money-input">
-            <span>£</span>
-            <input
-              type="number"
-              inputMode="decimal"
-              step="0.01"
-              min="0"
-              value={noVat ? '0.00' : draft.vat}
-              onChange={(e) => set('vat', e.target.value)}
-              placeholder="0.00"
-              disabled={noVat}
-              title={noVat ? 'No VAT at this rate' : undefined}
-            />
-          </div>
-        </Field>
-      </div>
-
-      <Field label="VAT rate">
-        <select
-          value={draft.vatRate}
-          onChange={(e) => {
-            changeRate(e.target.value as VatRate);
-            setRateTouched(true);
-          }}
-        >
-          {VAT_RATES.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.label}
-            </option>
-          ))}
-        </select>
-      </Field>
-
-      <div className="row-2">
-        <Field label="Category" error={errors.category} highlight={scanned.has('category')}>
-          <div className="select-swatch">
-            <span className="dot" style={catVar(selectedColor)} aria-hidden />
-            <select
-              value={currentCategory}
-              onChange={(e) => {
-                set('category', e.target.value);
-                setCategoryTouched(true);
-                setRemembered(null);
-              }}
-            >
-              {categories.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-              <option value={NEW_CATEGORY}>＋ New category…</option>
-            </select>
-          </div>
-        </Field>
-        <Field label="Date" error={errors.date} highlight={scanned.has('date')}>
-          <input type="date" value={draft.date} onChange={(e) => set('date', e.target.value)} />
-        </Field>
-      </div>
-
-      {draft.category === NEW_CATEGORY && (
-        <Field label="New category name" error={errors.newCategory}>
+      <fieldset className="form-fields" disabled={Boolean(lock)}>
+        <Field label="Name" error={errors.name} highlight={scanned.has('name')}>
           <input
             type="text"
-            value={draft.newCategory}
-            onChange={(e) => set('newCategory', e.target.value)}
-            placeholder="e.g. Training"
-            autoFocus
+            value={draft.name}
+            onChange={(e) => onNameChange(e.target.value)}
+            placeholder="e.g. Tesco, Train to Leeds"
+            autoComplete="off"
+            list={listId}
           />
+          <datalist id={listId}>
+            {supplierList.map((sup) => (
+              <option key={sup.name} value={sup.name} />
+            ))}
+          </datalist>
+          {remembered && (
+            <span className="field-hint">
+              Category set to <strong>{remembered}</strong> from your last receipt
+            </span>
+          )}
         </Field>
-      )}
-      {draft.category === NEW_CATEGORY && <CategoryColorPicker value={newColor} onChange={(c) => set('newColor', c)} />}
 
-      <Field label="Receipt image (optional)">
-        <ImageInput value={draft.image} onChange={(v) => set('image', v)} onError={onError} />
-      </Field>
-      {draft.image && canScan && (
-        <button type="button" className="btn btn-secondary scan-btn" onClick={scan} disabled={scanning} aria-busy={scanning}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-            <path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z" />
-          </svg>
-          {scanning ? 'Reading receipt…' : 'Read receipt'}
-        </button>
-      )}
+        <div className="row-2">
+          <Field label="Total (inc. VAT)" error={errors.total} highlight={scanned.has('total')}>
+            <div className="money-input">
+              <span>£</span>
+              <input
+                type="number"
+                inputMode="decimal"
+                step="0.01"
+                min="0"
+                value={draft.total}
+                onChange={(e) => set('total', e.target.value)}
+                placeholder="0.00"
+              />
+            </div>
+          </Field>
+          <Field
+            label="VAT"
+            error={errors.vat}
+            highlight={scanned.has('vat')}
+            action={
+              !noVat && (
+                <button
+                  type="button"
+                  className="link-btn"
+                  onClick={calcVat}
+                  title={`Calculate ${vatRateInfo(draft.vatRate).short} VAT from the total`}
+                >
+                  Calc {vatRateInfo(draft.vatRate).short}
+                </button>
+              )
+            }
+          >
+            <div className="money-input">
+              <span>£</span>
+              <input
+                type="number"
+                inputMode="decimal"
+                step="0.01"
+                min="0"
+                value={noVat ? '0.00' : draft.vat}
+                onChange={(e) => set('vat', e.target.value)}
+                placeholder="0.00"
+                disabled={noVat}
+                title={noVat ? 'No VAT at this rate' : undefined}
+              />
+            </div>
+          </Field>
+        </div>
+
+        <Field label="VAT rate">
+          <select
+            value={draft.vatRate}
+            onChange={(e) => {
+              changeRate(e.target.value as VatRate);
+              setRateTouched(true);
+            }}
+          >
+            {VAT_RATES.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        <div className="row-2">
+          <Field label="Category" error={errors.category} highlight={scanned.has('category')}>
+            <div className="select-swatch">
+              <span className="dot" style={catVar(selectedColor)} aria-hidden />
+              <select
+                value={currentCategory}
+                onChange={(e) => {
+                  set('category', e.target.value);
+                  setCategoryTouched(true);
+                  setRemembered(null);
+                }}
+              >
+                {categories.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+                <option value={NEW_CATEGORY}>＋ New category…</option>
+              </select>
+            </div>
+          </Field>
+          <Field label="Date" error={errors.date} highlight={scanned.has('date')}>
+            <input type="date" value={draft.date} onChange={(e) => set('date', e.target.value)} />
+          </Field>
+        </div>
+
+        {draft.category === NEW_CATEGORY && (
+          <Field label="New category name" error={errors.newCategory}>
+            <input
+              type="text"
+              value={draft.newCategory}
+              onChange={(e) => set('newCategory', e.target.value)}
+              placeholder="e.g. Training"
+              autoFocus
+            />
+          </Field>
+        )}
+        {draft.category === NEW_CATEGORY && <CategoryColorPicker value={newColor} onChange={(c) => set('newColor', c)} />}
+
+        <Field label="Receipt image (optional)">
+          <ImageInput value={draft.image} onChange={(v) => set('image', v)} onError={onError} />
+        </Field>
+        {draft.image && canScan && (
+          <button type="button" className="btn btn-secondary scan-btn" onClick={scan} disabled={scanning} aria-busy={scanning}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+              <path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z" />
+            </svg>
+            {scanning ? 'Reading receipt…' : 'Read receipt'}
+          </button>
+        )}
+
+      </fieldset>
 
       {duplicateOf && (
         <div className="dup-warning" role="alert">
@@ -391,7 +408,13 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
         </div>
       )}
 
-      {editing ? (
+      {lock ? (
+        <div className="form-actions">
+          <button type="button" className="btn btn-secondary" onClick={onCancelEdit}>
+            Close
+          </button>
+        </div>
+      ) : editing ? (
         <div className="form-actions">
           <button type="button" className="btn btn-secondary" onClick={onCancelEdit}>
             Cancel

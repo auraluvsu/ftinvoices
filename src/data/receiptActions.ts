@@ -1,6 +1,7 @@
 import type { Dispatch, SetStateAction } from 'react';
 import type { AppData } from '../appData';
-import type { Category } from '../types';
+import type { Category, FiledQuarter } from '../types';
+import { formatDate } from '../lib/format';
 import { dataUrlToBlob } from '../lib/image';
 import * as db from '../lib/db';
 
@@ -20,7 +21,12 @@ export interface ReceiptActionDeps {
   showLocal: (path: string, dataUrl: string) => void;
   scheduleImageDelete: (path: string) => void;
   cancelImageDelete: (path: string) => void;
+  /** The filed quarter locking a date, if any (the database enforces this too). */
+  lockedBy: (date: string) => FiledQuarter | undefined;
 }
+
+const lockedMessage = (f: FiledQuarter) =>
+  `That’s in a VAT quarter filed on ${formatDate(f.filedAt.slice(0, 10))}. Unfile the quarter first to change it.`;
 
 /** Saving, deleting (with Undo) and moving receipts of the open client. */
 export function receiptActions({
@@ -36,10 +42,16 @@ export function receiptActions({
   showLocal,
   scheduleImageDelete,
   cancelImageDelete,
+  lockedBy,
 }: ReceiptActionDeps): Pick<AppData, 'saveReceipt' | 'deleteReceipt' | 'deleteReceipts' | 'moveReceipts'> {
   return {
     saveReceipt: async (draft, newCategory) => {
       const existing = stored.find((r) => r.id === draft.id);
+      const lock = (existing && lockedBy(existing.date)) ?? lockedBy(draft.date);
+      if (lock) {
+        notify(lockedMessage(lock), 'error');
+        return false;
+      }
       let uploadedPath: string | undefined;
       try {
         // 1. Category (create it first if new)
@@ -103,6 +115,8 @@ export function receiptActions({
     deleteReceipt: (receipt) => {
       const row = stored.find((r) => r.id === receipt.id);
       if (!row) return;
+      const lock = lockedBy(row.date);
+      if (lock) return notify(lockedMessage(lock), 'error');
       setStored((prev) => prev.filter((r) => r.id !== row.id));
       db.deleteReceipt(row.id).then(
         () => {
@@ -126,15 +140,22 @@ export function receiptActions({
     },
 
     deleteReceipts: (list) => {
-      const ids = new Set(list.map((r) => r.id));
-      const rows = stored.filter((r) => ids.has(r.id));
-      if (!rows.length) return;
+      const wanted = new Set(list.map((r) => r.id));
+      const all = stored.filter((r) => wanted.has(r.id));
+      const rows = all.filter((r) => !lockedBy(r.date));
+      const skipped = all.length - rows.length;
+      if (!rows.length) {
+        if (skipped) notify('Those receipts are in filed VAT quarters, so they can’t be deleted. Unfile the quarter first.', 'error');
+        return;
+      }
+      const ids = new Set(rows.map((r) => r.id));
       setStored((prev) => prev.filter((r) => !ids.has(r.id)));
       db.deleteReceipts([...ids]).then(
         () => {
           const paths = rows.flatMap((r) => (r.imagePath ? [r.imagePath] : []));
           paths.forEach(scheduleImageDelete);
-          notify(`Deleted ${rows.length} receipt${rows.length === 1 ? '' : 's'}`, 'info', async () => {
+          const kept = skipped ? ` (${skipped} in filed quarters kept)` : '';
+          notify(`Deleted ${rows.length} receipt${rows.length === 1 ? '' : 's'}${kept}`, 'info', async () => {
             paths.forEach(cancelImageDelete);
             dismissToast();
             try {

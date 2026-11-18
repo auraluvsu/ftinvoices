@@ -124,5 +124,12 @@ export function recentQuarters(
   });
 }
 
+/** First and last day of the quarter starting at absolute month `start`, as YYYY-MM-DD. */
+export function quarterPeriod(start: number): { from: string; to: string } {
+  const end = start + 2;
+  const lastDay = new Date(Math.floor(end / 12), (end % 12) + 1, 0).getDate();
+  return { from: `${absToKey(start)}-01`, to: `${absToKey(end)}-${String(lastDay).padStart(2, '0')}` };
+}
+
 /** First day of the month after the quarter ends, as a Date (local time). */
 export const quarterEndExclusive = (start: number) => new Date(Math.floor((start + 3) / 12), (start + 3) % 12, 1);

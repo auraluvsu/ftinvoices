@@ -70,6 +70,47 @@ export type Database = {
           },
         ];
       };
+      filed_quarters: {
+        Row: {
+          box4: number;
+          box7: number;
+          client_id: string;
+          filed_at: string;
+          id: string;
+          period_end: string;
+          period_start: string;
+          user_id: string;
+        };
+        Insert: {
+          box4: number;
+          box7: number;
+          client_id: string;
+          filed_at?: string;
+          id?: string;
+          period_end: string;
+          period_start: string;
+          user_id?: string;
+        };
+        Update: {
+          box4?: number;
+          box7?: number;
+          client_id?: string;
+          filed_at?: string;
+          id?: string;
+          period_end?: string;
+          period_start?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'filed_quarters_client_id_fkey';
+            columns: ['client_id'];
+            isOneToOne: false;
+            referencedRelation: 'clients';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       receipts: {
         Row: {
           category_id: string;
