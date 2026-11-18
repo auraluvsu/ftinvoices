@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import type { Category, Client, Receipt } from './types';
 import { AppDataContext as Ctx, type AppData } from './appData';
 import { useAuth } from './authContext';
@@ -12,12 +12,12 @@ import { DeleteClientModal } from './components/DeleteClientModal';
 import { ManageCategoriesModal } from './components/ManageCategoriesModal';
 import { ToastView } from './components/ToastView';
 import { useToasts } from './data/useToasts';
+import { useReceiptImages, useResignImages } from './data/useReceiptImages';
 
 type Phase = { kind: 'loading' } | { kind: 'error'; message: string } | { kind: 'no-client' } | { kind: 'ready' };
 
-const RESIGN_EVERY_MS = 6 * 60 * 60 * 1000; // well inside the 12h signed-URL lifetime
 const REFRESH_MIN_GAP_MS = 60_000;
-const IMAGE_DELETE_DELAY_MS = 8000; // keep the image until the Undo toast is gone
+const IMAGE_DELETE_DELAY_MS = 8000; // matches useReceiptImages; bulk delete keeps its own timer
 
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -51,16 +51,9 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const client = clients.find((c) => c.id === clientId) ?? null;
   const [categoryList, setCategoryList] = useState<Category[]>([]);
   const [stored, setStored] = useState<db.StoredReceipt[]>([]);
-  /** Images of deleted receipts waiting out the Undo window: path → timer (one mutable Map for the provider's life). */
-  const [pendingDeletes] = useState(() => new Map<string, ReturnType<typeof setTimeout>>());
-  const [urls, setUrls] = useState<Map<string, string>>(() => new Map());
+  const { urls, replaceUrls, mergeUrls, showLocal, scheduleImageDelete, cancelImageDelete, isPendingDelete } =
+    useReceiptImages(session.access_token);
   const { toast, notify, dismiss: dismissToast } = useToasts();
-  const storedRef = useRef(stored);
-  /** When image links were last signed (ms); used to spot links that may have expired. */
-  const signedAtRef = useRef(0);
-  useEffect(() => {
-    storedRef.current = stored;
-  }, [stored]);
 
   /** Fetches everything, then applies it in one go (state is only set after the network calls). */
   // silent: refresh in place, keeping the current screen if it fails.
@@ -77,13 +70,13 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       setClientId(c.id);
       setCategoryList(cats);
       setStored(recs);
-      setUrls(signed);
+      replaceUrls(signed);
       setPhase({ kind: 'ready' });
     } catch (e) {
       if (silent) console.error(e);
       else setPhase({ kind: 'error', message: errMsg(e) });
     }
-  }, []);
+  }, [replaceUrls]);
 
   const reload = useCallback(
     (preferredId?: string, opts: { silent?: boolean } = {}) => {
@@ -123,64 +116,14 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
-  /** Deletes an image after the Undo window, unless cancelImageDelete is called first. */
-  const scheduleImageDelete = useCallback((path: string) => {
-    const timer = setTimeout(() => {
-      pendingDeletes.delete(path);
-      db.removeImages([path]).catch(console.error);
-    }, IMAGE_DELETE_DELAY_MS);
-    pendingDeletes.set(path, timer);
-  }, [pendingDeletes]);
-  const cancelImageDelete = useCallback((path: string) => {
-    clearTimeout(pendingDeletes.get(path));
-    pendingDeletes.delete(path);
-  }, [pendingDeletes]);
-
-  // If the page closes during an Undo window, delete those images now rather than never.
-  useEffect(() => {
-    const pending = pendingDeletes;
-    const flush = () => {
-      if (!pending.size) return;
-      for (const t of pending.values()) clearTimeout(t);
-      db.removeImagesOnExit([...pending.keys()]);
-      pending.clear();
-    };
-    window.addEventListener('pagehide', flush);
-    return () => window.removeEventListener('pagehide', flush);
-  }, [pendingDeletes]);
-
-  // Keep the token handy for keepalive requests sent while the page closes.
-  useEffect(() => db.setAccessToken(session.access_token), [session.access_token]);
-
   useEffect(() => {
     // Initial load from Supabase; state is only set after the awaited network calls.
     // oxlint-disable-next-line react/set-state-in-effect
     void fetchBooks();
   }, [fetchBooks]);
 
-  // Signed URLs expire; refresh them periodically while the app stays open.
-  // Timers pause while the computer sleeps, so also check when the tab is shown or focused again.
-  useEffect(() => {
-    if (phase.kind !== 'ready') return;
-    // Becoming ready means fetchBooks has just signed every link.
-    signedAtRef.current = Date.now();
-    const resign = () => {
-      const paths = storedRef.current.flatMap((r) => (r.imagePath ? [r.imagePath] : []));
-      signedAtRef.current = Date.now();
-      db.signImages(paths).then((m) => setUrls((prev) => new Map([...prev, ...m])), console.error);
-    };
-    const resignIfStale = () => {
-      if (document.visibilityState === 'visible' && Date.now() - signedAtRef.current >= RESIGN_EVERY_MS) resign();
-    };
-    const t = setInterval(resign, RESIGN_EVERY_MS);
-    document.addEventListener('visibilitychange', resignIfStale);
-    window.addEventListener('focus', resignIfStale);
-    return () => {
-      clearInterval(t);
-      document.removeEventListener('visibilitychange', resignIfStale);
-      window.removeEventListener('focus', resignIfStale);
-    };
-  }, [phase.kind]);
+  const imagePaths = useMemo(() => stored.flatMap((r) => (r.imagePath ? [r.imagePath] : [])), [stored]);
+  useResignImages(imagePaths, phase.kind === 'ready', mergeUrls);
 
   const categoryNames = useMemo(() => new Map(categoryList.map((c) => [c.id, c.name])), [categoryList]);
 
@@ -308,10 +251,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
           const saved = existing?.updatedAt ? await db.updateReceipt(row, existing.updatedAt) : await db.upsertReceipt(row);
 
           // Show the freshly uploaded image straight from memory; no need to sign it yet.
-          if (isNewImage && imagePath) {
-            const path = imagePath;
-            setUrls((prev) => new Map(prev).set(path, draft.image!));
-          }
+          if (isNewImage && imagePath) showLocal(imagePath, draft.image!);
           setStored((prev) => (existing ? prev.map((r) => (r.id === saved.id ? saved : r)) : [...prev, saved]));
 
           // Old image replaced or removed → delete it from storage.
@@ -412,7 +352,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       },
       notify,
     };
-  }, [client, clients, reload, stored, receipts, categories, categoryList, categoryColor, userId, notify, dismissToast, scheduleImageDelete, cancelImageDelete]);
+  }, [client, clients, reload, stored, receipts, categories, categoryList, categoryColor, userId, notify, dismissToast, scheduleImageDelete, cancelImageDelete, showLocal]);
 
   if (phase.kind !== 'ready' || !value) {
     return (
@@ -437,7 +377,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
             const used = new Set(stored.flatMap((r) => (r.imagePath ? [r.imagePath] : [])));
             const all = await db.listImages(`${userId}/${value.client.id}`);
             // Images waiting out an Undo window aren't "unused" yet.
-            return all.filter((p) => !used.has(p) && !pendingDeletes.has(p));
+            return all.filter((p) => !used.has(p) && !isPendingDelete(p));
           }}
           onRemoveImages={(paths) => db.removeImages(paths)}
           onSave={async (c) => {
