@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { emptyFilters, type MonthFilters, type Receipt, type SortDir, type SortField } from '../types';
 import { formatDate, formatMoney, formatMonthKey } from '../lib/format';
 import { activeFilterCount, applyFilters, sortReceipts, sumTotals } from '../lib/receipts';
-import { VAT_RATES, type VatRate } from '../lib/vatRates';
+import { VAT_RATES, vatRateInfo, type VatRate } from '../lib/vatRates';
 import type { ExportFormat } from '../lib/export';
 import { ExportMenu } from './ExportMenu';
 import { useAppData } from '../appData';
@@ -246,7 +246,9 @@ export function MonthSection({
                   </div>
                   <div className="receipt-amounts">
                     <strong>{formatMoney(r.total)}</strong>
-                    <span className="muted">VAT {formatMoney(r.vat)}</span>
+                    <span className="muted">
+                      {r.vatRate === 'standard' ? `VAT ${formatMoney(r.vat)}` : r.vatRate === 'reduced' ? `VAT ${formatMoney(r.vat)} (5%)` : vatRateInfo(r.vatRate).short}
+                    </span>
                   </div>
                   <div className="receipt-actions">
                     <button type="button" className="btn btn-ghost btn-icon" onClick={() => onEdit(r)} aria-label={`Edit ${r.name}`} title="Edit">
