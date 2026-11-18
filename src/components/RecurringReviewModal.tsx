@@ -93,6 +93,11 @@ export function RecurringReviewModal({ onClose }: { onClose: () => void }) {
             <legend>
               <strong>{expense.name}</strong> <span className="muted">· {frequencyLabel(expense.frequency)}</span>
             </legend>
+            <div className="recurring-row recurring-head" aria-hidden>
+              <span>Date</span>
+              <span>Total</span>
+              <span>VAT</span>
+            </div>
             {entries[expense.id].map((e, i) => {
               const lock = lockedBy(e.date);
               return (
@@ -125,7 +130,7 @@ export function RecurringReviewModal({ onClose }: { onClose: () => void }) {
                         />
                       </div>
                       <div className="money-input">
-                        <span>VAT £</span>
+                        <span>£</span>
                         <input
                           type="number"
                           inputMode="decimal"
