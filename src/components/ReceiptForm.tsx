@@ -5,7 +5,8 @@ import { newId, round2, todayIso } from '../lib/format';
 import { catVar, SUGGESTED_COLORS } from '../lib/color';
 import { supplierMemory } from '../lib/receipts';
 import { urlToDataUrl } from '../lib/image';
-import { scanReceipt } from '../lib/db';
+import { scanReceipt, ScanUnavailableError } from '../lib/db';
+import { markScanUnavailable, scanAvailable } from '../lib/scanAvailability';
 import { ImageInput } from './ImageInput';
 import { CategoryColorPicker } from './CategoryColorPicker';
 
@@ -72,6 +73,7 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
 
   // Receipt scanning: fills only the fields that are still empty, then highlights them.
   const [scanning, setScanning] = useState(false);
+  const [canScan, setCanScan] = useState(scanAvailable);
   const [scanned, setScanned] = useState<Set<keyof Draft>>(() => new Set());
   const scan = async () => {
     if (!draft.image || scanning) return;
@@ -100,6 +102,12 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
       setScanned(new Set(keys));
       setTimeout(() => setScanned(new Set()), 2500);
     } catch (e) {
+      if (e instanceof ScanUnavailableError) {
+        markScanUnavailable();
+        setCanScan(false);
+        onError(e.message);
+        return;
+      }
       onError(`Couldn’t read the receipt: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setScanning(false);
@@ -298,7 +306,7 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
       <Field label="Receipt image (optional)">
         <ImageInput value={draft.image} onChange={(v) => set('image', v)} onError={onError} />
       </Field>
-      {draft.image && (
+      {draft.image && canScan && (
         <button type="button" className="btn btn-secondary scan-btn" onClick={scan} disabled={scanning} aria-busy={scanning}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
             <path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z" />
