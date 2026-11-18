@@ -63,7 +63,6 @@ These came up while planning and haven't been built yet.
 
 **Faster entry**
 - Recurring expenses (monthly subscriptions added automatically).
-- Duplicate warning (same supplier, amount and date).
 - Install as a phone app that opens the camera directly.
 - Select several receipts at once to recategorise, delete or export.
 

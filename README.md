@@ -11,6 +11,7 @@ Built with React + TypeScript (Vite), with data stored in Supabase behind Google
 - "Calc 20%" works out VAT from a VAT-inclusive total.
 - **Read receipt** fills in the shop name, total, VAT, date and category from the photo using Claude. It only fills empty fields and briefly highlights what it filled.
 - **Supplier memory**: the name field suggests past suppliers, and picking one sets the category you last used for it.
+- **Duplicate warning**: saving a receipt with the same supplier and total as one within 3 days asks before saving it twice.
 - Click any receipt to edit it in a popup; delete with Undo.
 
 **Organising**

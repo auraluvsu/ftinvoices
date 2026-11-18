@@ -1,9 +1,10 @@
-import { useId, useMemo, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 import type { NewCategory, Receipt, ReceiptDraft } from '../types';
 import { useAppData } from '../appData';
-import { newId, round2, todayIso } from '../lib/format';
+import { formatDate, formatMoney, newId, round2, todayIso } from '../lib/format';
 import { catVar, SUGGESTED_COLORS } from '../lib/color';
 import { supplierMemory } from '../lib/receipts';
+import { findDuplicate } from '../lib/duplicates';
 import { urlToDataUrl } from '../lib/image';
 import { scanReceipt } from '../lib/db';
 import { mergeScan } from '../lib/scan';
@@ -61,6 +62,10 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
   const [draft, setDraft] = useState<Draft>(() => (editing ? fromReceipt(editing) : blank(categories[0])));
   const [errors, setErrors] = useState<Partial<Record<keyof Draft, string>>>({});
   const [saving, setSaving] = useState(false);
+  // Possible duplicate found on submit; "Save anyway" skips the check once. A ref, because the
+  // button's click and the form's submit happen in the same tick, before state would update.
+  const [duplicateOf, setDuplicateOf] = useState<Receipt | null>(null);
+  const allowDuplicate = useRef(false);
   const { categoryColor, receipts } = useAppData();
   // Supplier memory: typing a known name picks the category last used for it,
   // unless the category has been chosen by hand.
@@ -131,6 +136,7 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
 
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => {
     setDraft((d) => ({ ...d, [k]: v }));
+    setDuplicateOf(null);
     setErrors((e) => ({ ...e, [k]: undefined }));
   };
 
@@ -177,6 +183,14 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
       date: draft.date,
       image: draft.image,
     };
+
+    const dup = allowDuplicate.current ? undefined : findDuplicate(receipts, receipt);
+    allowDuplicate.current = false;
+    if (dup) {
+      setDuplicateOf(dup);
+      return;
+    }
+    setDuplicateOf(null);
 
     setSaving(true);
     const ok = await onSave(receipt, isNew && !existing ? { name: finalCategory, color: newColor } : undefined);
@@ -310,6 +324,28 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
           </svg>
           {scanning ? 'Reading receipt…' : 'Read receipt'}
         </button>
+      )}
+
+      {duplicateOf && (
+        <div className="dup-warning" role="alert">
+          <p>
+            This looks like a receipt you’ve already added: <strong>{duplicateOf.name}</strong>,{' '}
+            {formatMoney(duplicateOf.total)} on {formatDate(duplicateOf.date)}.
+          </p>
+          <div className="dup-actions">
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setDuplicateOf(null)}>
+              Don’t save
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary btn-sm"
+              onClick={() => (allowDuplicate.current = true)}
+              disabled={saving}
+            >
+              Save anyway
+            </button>
+          </div>
+        </div>
       )}
 
       {editing ? (
