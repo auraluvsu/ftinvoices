@@ -7,6 +7,13 @@ Supabase dashboard → **SQL Editor** → New query → paste [`schema.sql`](sch
 
 This creates `clients`, `categories` and `receipts` (row-level security on all three) plus a private `receipts` storage bucket. A signed-in user can only ever read or write their own rows and files.
 
+### Updating an existing database
+`schema.sql` always describes the whole, current schema, so a new project only ever runs that. Changes to a database that's already live come as numbered files in [`migrations/`](migrations/). When a pull request adds one, paste it into the SQL Editor and run it **before** merging, since the new app code expects the new columns. Each migration is safe to run twice.
+
+| Migration | Adds |
+|---|---|
+| `20261118120000_vat_rate.sql` | `receipts.vat_rate` (20% / 5% / 0% / exempt / outside the scope) |
+
 ## 2. Google sign-in
 1. Google Cloud Console → APIs & Services → **OAuth consent screen** (External, add your email as a test user), then **Credentials → Create credentials → OAuth client ID** → *Web application*.
    - Authorised redirect URI: `https://<project-ref>.supabase.co/auth/v1/callback`

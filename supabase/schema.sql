@@ -1,5 +1,7 @@
 -- Bookkeeping schema for Supabase.
 -- Run once in the Supabase dashboard: SQL Editor → New query → paste → Run.
+-- This file is the whole schema for a new project. An existing project instead runs the files in
+-- supabase/migrations/ that it hasn't run yet, oldest first (see supabase/README.md).
 -- Every table has row-level security: a signed-in user only ever sees their own rows.
 
 -- ===== Clients (one set of books per client) =====
@@ -33,11 +35,15 @@ create table public.receipts (
   name        text not null check (length(trim(name)) > 0),
   total       numeric(12,2) not null check (total >= 0),
   vat         numeric(12,2) not null default 0 check (vat >= 0 and vat <= total),
+  -- standard 20%, reduced 5%, zero-rated, exempt, or outside (supplier not VAT registered)
+  vat_rate    text not null default 'standard'
+              constraint receipts_vat_rate_check check (vat_rate in ('standard', 'reduced', 'zero', 'exempt', 'outside')),
   date        date not null,
   image_path  text,                            -- path in the 'receipts' storage bucket
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now(),
-  foreign key (category_id, client_id) references public.categories (id, client_id) on delete restrict
+  foreign key (category_id, client_id) references public.categories (id, client_id) on delete restrict,
+  constraint receipts_vat_rate_vat_check check (vat_rate in ('standard', 'reduced') or vat = 0)
 );
 create index receipts_client_date_idx on public.receipts (client_id, date desc);
 

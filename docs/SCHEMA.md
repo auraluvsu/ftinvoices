@@ -52,6 +52,7 @@ Per-client categories, each with a display colour.
 | `name` | text | Supplier / description, required |
 | `total` | numeric(12,2) | Gross amount including VAT, ≥ 0 |
 | `vat` | numeric(12,2) | VAT amount, ≥ 0 and never more than `total` |
+| `vat_rate` | text | `standard` (20%, the default), `reduced` (5%), `zero` (0%), `exempt`, or `outside` (supplier not VAT registered). The last three must have `vat = 0` |
 | `date` | date | Receipt date |
 | `image_path` | text | Path of the photo in the storage bucket, or null |
 | `created_at` | timestamptz | Set on insert; used to break ties when sorting |
@@ -65,6 +66,7 @@ Index: `(client_id, date desc)` for loading a client's receipts newest first.
 - **Categories in use can't be deleted** (`on delete restrict`). The app's *Merge…* action moves the receipts to another category first, then deletes it.
 - **Deleting a client deletes its categories and receipts** (`on delete cascade`). Image files aren't covered by that, so the app's *Delete client* empties the client's storage folder first.
 - **Sensible amounts**: totals and VAT can't be negative, and VAT can't exceed the total.
+- **No VAT on zero-rated, exempt or outside-the-scope receipts**: `vat` must be 0 unless `vat_rate` is `standard` or `reduced`.
 
 ## Triggers
 
