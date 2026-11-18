@@ -10,6 +10,7 @@ import { QuarterlyReview } from '../components/QuarterlyReview';
 import { ImageModal } from '../components/ImageModal';
 import { EditReceiptModal } from '../components/EditReceiptModal';
 import { Stat } from '../components/Stat';
+import { BulkBar } from '../components/BulkBar';
 
 const VIEW_KEY = 'ftinvoices.view';
 type View = 'monthly' | 'quarterly';
@@ -31,6 +32,17 @@ export function ReceiptsPage() {
   const [query, setQuery] = useState('');
   const searching = query.trim() !== '';
   const shown = useMemo(() => searchReceipts(receipts, query), [receipts, query]);
+
+  // Select mode: pick receipts to move, export or delete together. Only shown ones count.
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const toggleSelected = (r: Receipt) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(r.id)) next.add(r.id);
+      return next;
+    });
+  const selectedReceipts = useMemo(() => shown.filter((r) => selected.has(r.id)), [shown, selected]);
   const shownTotals = useMemo(() => sumTotals(shown), [shown]);
 
   const years = useMemo(() => groupByYear(groupByMonth(shown)), [shown]);
@@ -117,6 +129,7 @@ export function ReceiptsPage() {
           </div>
         ) : (
           <>
+            <div className="view-row">
             <div className="tabs" role="tablist" aria-label="View">
               {(['monthly', 'quarterly'] as const).map((v) => (
                 <button
@@ -130,6 +143,12 @@ export function ReceiptsPage() {
                   {v === 'monthly' ? 'Monthly' : 'Quarterly review'}
                 </button>
               ))}
+            </div>
+              {view === 'monthly' && !selecting && (
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setSelecting(true)}>
+                  Select
+                </button>
+              )}
             </div>
             {view === 'quarterly' ? (
               <QuarterlyReview
@@ -154,6 +173,7 @@ export function ReceiptsPage() {
                       onDelete={handleDelete}
                       onViewImage={setViewing}
                       onExport={exportList}
+                      selection={selecting ? { selected, toggle: toggleSelected } : undefined}
                     />
                   ))}
                 </section>
@@ -175,6 +195,19 @@ export function ReceiptsPage() {
       )}
 
       {viewing?.image && <ImageModal receipt={viewing} onClose={() => setViewing(null)} />}
+
+      {selecting && view === 'monthly' && (
+        <BulkBar
+          selected={selectedReceipts}
+          shown={shown}
+          onSelectAll={() => setSelected(new Set(shown.map((r) => r.id)))}
+          onClear={() => setSelected(new Set())}
+          onDone={() => {
+            setSelecting(false);
+            setSelected(new Set());
+          }}
+        />
+      )}
     </main>
   );
 }

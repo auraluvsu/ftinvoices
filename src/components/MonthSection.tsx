@@ -16,6 +16,8 @@ interface Props {
   onDelete: (r: Receipt) => void;
   onViewImage: (r: Receipt) => void;
   onExport: (receipts: Receipt[], format: ExportFormat, label: string) => void;
+  /** Select mode: rows show a checkbox and a click toggles them instead of opening the editor. */
+  selection?: { selected: Set<string>; toggle: (r: Receipt) => void };
 }
 
 const SORT_LABELS: Record<SortField, string> = {
@@ -34,6 +36,7 @@ export function MonthSection({
   onDelete,
   onViewImage,
   onExport,
+  selection,
 }: Props) {
   const { categoryColor } = useAppData();
   const [open, setOpen] = useState(defaultOpen);
@@ -185,13 +188,24 @@ export function MonthSection({
               {visible.map((r) => (
                 <li
                   key={r.id}
-                  className={`receipt clickable${editingId === r.id ? ' editing' : ''}`}
-                  title="Click to edit"
+                  className={`receipt clickable${editingId === r.id ? ' editing' : ''}${selection?.selected.has(r.id) ? ' selected' : ''}`}
+                  title={selection ? 'Click to select' : 'Click to edit'}
                   onClick={(e) => {
-                    // Thumbnail / edit / delete buttons handle their own clicks.
-                    if (!(e.target as HTMLElement).closest('button, a')) onEdit(r);
+                    // Thumbnail / edit / delete buttons and the checkbox handle their own clicks.
+                    if ((e.target as HTMLElement).closest('button, a, input')) return;
+                    if (selection) selection.toggle(r);
+                    else onEdit(r);
                   }}
                 >
+                  {selection && (
+                    <input
+                      type="checkbox"
+                      className="receipt-check"
+                      checked={selection.selected.has(r.id)}
+                      onChange={() => selection.toggle(r)}
+                      aria-label={`Select ${r.name}`}
+                    />
+                  )}
                   {r.image ? (
                     <button type="button" className="thumb" onClick={() => onViewImage(r)} aria-label={`View receipt image for ${r.name}`}>
                       <img src={r.image} alt="" loading="lazy" />
