@@ -63,7 +63,7 @@ Index: `(client_id, date desc)` for loading a client's receipts newest first.
 
 - **Category belongs to the same client.** The foreign key `(category_id, client_id) → categories(id, client_id)` means a receipt can't point at another client's category.
 - **Categories in use can't be deleted** (`on delete restrict`). The app's *Merge…* action moves the receipts to another category first, then deletes it.
-- **Deleting a client deletes its categories and receipts** (`on delete cascade`). Image files are not removed automatically.
+- **Deleting a client deletes its categories and receipts** (`on delete cascade`). Image files aren't covered by that, so the app's *Delete client* empties the client's storage folder first.
 - **Sensible amounts**: totals and VAT can't be negative, and VAT can't exceed the total.
 
 ## Triggers

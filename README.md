@@ -21,6 +21,7 @@ Built with React + TypeScript (Vite), with data stored in Supabase behind Google
 **Clients**
 - A separate set of books per client, switched from the top bar.
 - Client settings: name, VAT number and VAT quarter stagger (calendar quarters, or quarters ending Apr/Jul/Oct/Jan or May/Aug/Nov/Feb).
+- Delete a client (with its receipts and photos) from the client menu, after downloading a backup and typing its name.
 
 **Overview and reports**
 - Overview page: spend and VAT this quarter and this year, a spend-per-quarter chart, spend by category, and biggest bills.

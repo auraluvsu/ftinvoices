@@ -61,7 +61,6 @@ These came up while planning and haven't been built yet.
 
 **Data and backup**
 - One-click backup and restore of a client's books.
-- Delete a client (with its images) from Client settings.
 
 **Faster entry**
 - Recurring expenses (monthly subscriptions added automatically).
