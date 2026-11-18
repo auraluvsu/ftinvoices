@@ -1,5 +1,6 @@
 import type { MonthFilters, Receipt, SortDir, SortField } from '../types';
 import { monthKey } from './format';
+import type { VatRate } from './vatRates';
 
 export interface MonthGroup {
   key: string; // YYYY-MM
@@ -105,6 +106,8 @@ export interface Supplier {
   name: string;
   /** Category used on the most recent receipt from this supplier */
   category: string;
+  /** VAT rate on the most recent receipt from this supplier */
+  vatRate: VatRate;
   count: number;
 }
 
@@ -115,7 +118,7 @@ export function supplierMemory(receipts: Receipt[]): Map<string, Supplier> {
   for (const r of sorted) {
     const key = r.name.trim().toLowerCase();
     if (!key) continue;
-    map.set(key, { name: r.name.trim(), category: r.category, count: (map.get(key)?.count ?? 0) + 1 });
+    map.set(key, { name: r.name.trim(), category: r.category, vatRate: r.vatRate, count: (map.get(key)?.count ?? 0) + 1 });
   }
   return map;
 }
