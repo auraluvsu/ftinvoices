@@ -1,15 +1,15 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
-import type { Receipt } from '../types';
+import type { Income, Receipt } from '../types';
 import { formatDate, formatMoney, formatMonthKey, todayIso } from '../lib/format';
 import { sumTotals } from '../lib/receipts';
-import { categoryBreakdown, groupByQuarter, quarterPeriod, STAGGER_OPTIONS, type QuarterGroup, type QuarterStagger } from '../lib/quarters';
+import { categoryBreakdown, emptyQuarter, groupByQuarter, quarterPeriod, quarterStart, STAGGER_OPTIONS, type QuarterGroup, type QuarterStagger } from '../lib/quarters';
 import type { ExportFormat } from '../lib/export';
 import { ExportMenu } from './ExportMenu';
 import { LockIcon } from './LockIcon';
 import { useAppData } from '../appData';
 import { catVar } from '../lib/color';
-import { box4Text, box7Text, vatReturnBoxes } from '../lib/vatReturn';
+import { moneyBoxText, poundsBoxText, vatReturnBoxes } from '../lib/vatReturn';
 
 interface Props {
   receipts: Receipt[];
@@ -19,7 +19,20 @@ interface Props {
 }
 
 export function QuarterlyReview({ receipts, stagger, onEditSettings, onExport }: Props) {
-  const quarters = useMemo(() => groupByQuarter(receipts, stagger), [receipts, stagger]);
+  const { income } = useAppData();
+  // Quarters with receipts, plus any that only have income, newest first.
+  const quarters = useMemo(() => {
+    const groups = groupByQuarter(receipts, stagger);
+    const have = new Set(groups.map((g) => g.start));
+    for (const i of income) {
+      const start = quarterStart(i.date, stagger);
+      if (!have.has(start)) {
+        have.add(start);
+        groups.push(emptyQuarter(start, stagger));
+      }
+    }
+    return groups.sort((a, b) => b.start - a.start);
+  }, [receipts, income, stagger]);
 
   return (
     <div className="quarters">
@@ -57,7 +70,7 @@ function QuarterCard({
   onExport: Props['onExport'];
 }) {
   const t = sumTotals(quarter.receipts);
-  const { categoryColor } = useAppData();
+  const { categoryColor, income } = useAppData();
   const cats = categoryBreakdown(quarter.receipts);
   const prevTotal = previous ? sumTotals(previous.receipts).total : null;
   const change = prevTotal ? ((t.total - prevTotal) / prevTotal) * 100 : null;
@@ -102,7 +115,7 @@ function QuarterCard({
         </div>
       </div>
 
-      <VatReturnStrip receipts={quarter.receipts} />
+      <VatReturnStrip receipts={quarter.receipts} income={quarterIncome(income, quarter)} showSales={income.length > 0} />
       <FilingStatus quarter={quarter} />
 
       <div className="quarter-body">
@@ -160,20 +173,39 @@ function QuarterCard({
   );
 }
 
-/** Box 4 and Box 7 of the VAT return, with copy buttons for pasting into HMRC software. */
-function VatReturnStrip({ receipts }: { receipts: Receipt[] }) {
-  const { box4, box7 } = vatReturnBoxes(receipts);
+/** Income dated inside a quarter. */
+function quarterIncome(income: Income[], q: QuarterGroup): Income[] {
+  const { from, to } = quarterPeriod(q.start);
+  return income.filter((i) => i.date >= from && i.date <= to);
+}
+
+const pounds = (n: number) => `£${n.toLocaleString('en-GB')}`;
+
+/**
+ * The VAT return's boxes, with copy buttons for pasting into HMRC software. Purchase boxes (4, 7)
+ * always; sales boxes (1, 3, 5, 6) once the client has any income recorded.
+ */
+function VatReturnStrip({ receipts, income, showSales }: { receipts: Receipt[]; income: Income[]; showSales: boolean }) {
+  const b = vatReturnBoxes(receipts, income);
   return (
     <div className="vat-return" aria-label="VAT return figures">
-      <VatBox box="Box 4" label="VAT reclaimed on purchases" display={formatMoney(box4)} copyText={box4Text(box4)} />
-      <VatBox
-        box="Box 7"
-        label="Purchases excluding VAT (whole pounds)"
-        display={`£${box7.toLocaleString('en-GB')}`}
-        copyText={box7Text(box7)}
-      />
+      {showSales && <VatBox box="Box 1" label="VAT due on sales" display={formatMoney(b.box1)} copyText={moneyBoxText(b.box1)} />}
+      {showSales && <VatBox box="Box 3" label="Total VAT due (Box 1 + Box 2)" display={formatMoney(b.box3)} copyText={moneyBoxText(b.box3)} />}
+      <VatBox box="Box 4" label="VAT reclaimed on purchases" display={formatMoney(b.box4)} copyText={moneyBoxText(b.box4)} />
+      {showSales && (
+        <VatBox
+          box="Box 5"
+          label={b.box5 >= 0 ? 'Net VAT to pay HMRC' : 'Net VAT HMRC owes you'}
+          display={formatMoney(Math.abs(b.box5))}
+          copyText={moneyBoxText(Math.abs(b.box5))}
+        />
+      )}
+      {showSales && <VatBox box="Box 6" label="Sales excluding VAT (whole pounds)" display={pounds(b.box6)} copyText={poundsBoxText(b.box6)} />}
+      <VatBox box="Box 7" label="Purchases excluding VAT (whole pounds)" display={pounds(b.box7)} copyText={poundsBoxText(b.box7)} />
       <p className="vat-return-note muted">
-        Assumes all VAT on these receipts can be reclaimed. Sales boxes (1, 3, 6) aren’t worked out here.
+        {showSales
+          ? 'Assumes all VAT on receipts can be reclaimed. Box 2, 8 and 9 (EU trade) are 0. Box 6 leaves out sales outside the scope of VAT.'
+          : 'Assumes all VAT on these receipts can be reclaimed. Add income on the Income page to work out the sales boxes (1, 3, 5, 6).'}
       </p>
     </div>
   );
@@ -204,14 +236,16 @@ function VatBox({ box, label, display, copyText }: { box: string; label: string;
 
 /** "Mark as filed" for a finished quarter, or when and what was filed, with Unfile. */
 function FilingStatus({ quarter }: { quarter: QuarterGroup }) {
-  const { filedQuarters, fileQuarter, unfileQuarter } = useAppData();
+  const { filedQuarters, fileQuarter, unfileQuarter, income } = useAppData();
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const period = quarterPeriod(quarter.start);
   const filed = filedQuarters.find((f) => f.start === period.from);
-  const boxes = vatReturnBoxes(quarter.receipts);
+  const sales = quarterIncome(income, quarter);
+  const boxes = vatReturnBoxes(quarter.receipts, sales);
   const ended = period.to < todayIso();
-  const n = quarter.receipts.length;
+  const plural = (k: number, word: string) => `${k} ${word}${k === 1 ? '' : 's'}`;
+  const what = [plural(quarter.receipts.length, 'receipt'), sales.length > 0 && plural(sales.length, 'income record')].filter(Boolean).join(' and ');
 
   const run = async (action: () => Promise<boolean>) => {
     setBusy(true);
@@ -221,7 +255,12 @@ function FilingStatus({ quarter }: { quarter: QuarterGroup }) {
   };
 
   if (filed) {
-    const changed = filed.box4 !== boxes.box4 || filed.box7 !== boxes.box7;
+    const changed =
+      filed.box4 !== boxes.box4 ||
+      filed.box7 !== boxes.box7 ||
+      (filed.box1 ?? 0) !== boxes.box1 ||
+      (filed.box6 ?? 0) !== boxes.box6;
+    const salesFiled = filed.box1 != null && (filed.box1 !== 0 || filed.box6 !== 0);
     return (
       <div className="filing filed">
         <p>
@@ -231,17 +270,19 @@ function FilingStatus({ quarter }: { quarter: QuarterGroup }) {
           <strong>Filed {formatDate(filed.filedAt.slice(0, 10))}</strong>
           <span className="muted">
             {' '}
-            · Box 4 {formatMoney(filed.box4)} · Box 7 £{filed.box7.toLocaleString('en-GB')} · receipts locked
+            {salesFiled && ` · Box 1 ${formatMoney(filed.box1!)} · Box 6 ${pounds(filed.box6 ?? 0)}`} · Box 4 {formatMoney(filed.box4)} · Box 7{' '}
+            {pounds(filed.box7)} · locked
           </span>
         </p>
         {changed && (
           <p className="filing-warn" role="note">
-            The figures now differ from what was filed (Box 4 {formatMoney(boxes.box4)}, Box 7 £{boxes.box7.toLocaleString('en-GB')}).
+            The figures now differ from what was filed (Box 1 {formatMoney(boxes.box1)}, Box 4 {formatMoney(boxes.box4)}, Box 6 {pounds(boxes.box6)}, Box 7{' '}
+            {pounds(boxes.box7)}).
           </p>
         )}
         {confirming ? (
           <div className="filing-confirm">
-            <span>Unfile {quarter.label}? Its receipts can be edited again.</span>
+            <span>Unfile {quarter.label}? Its receipts and income can be edited again.</span>
             <button type="button" className="btn btn-secondary btn-sm" onClick={() => setConfirming(false)}>
               Cancel
             </button>
@@ -264,7 +305,7 @@ function FilingStatus({ quarter }: { quarter: QuarterGroup }) {
       {confirming ? (
         <div className="filing-confirm">
           <span>
-            Mark {quarter.label} as filed? Its {n} receipt{n === 1 ? '' : 's'} will be locked, and Box 4 and Box 7 saved as they are now.
+            Mark {quarter.label} as filed? Its {what} will be locked, and the VAT figures saved as they are now.
           </span>
           <button type="button" className="btn btn-secondary btn-sm" onClick={() => setConfirming(false)}>
             Cancel

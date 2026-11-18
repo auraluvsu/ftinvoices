@@ -1,5 +1,5 @@
 import { supabase, supabaseKey, supabaseUrl } from './supabase';
-import type { Category, Client, FiledQuarter, Receipt, RecurringExpense } from '../types';
+import type { Category, Client, FiledQuarter, Income, Receipt, RecurringExpense } from '../types';
 import { isFrequency } from './recurring';
 import type { QuarterStagger } from './quarters';
 import type { Tables, TablesUpdate } from './database.types';
@@ -230,8 +230,11 @@ export async function setReceiptsCategory(clientId: string, ids: string[], categ
 }
 
 // ---------- Filed VAT quarters ----------
-type FiledRow = Pick<Tables<'filed_quarters'>, 'id' | 'client_id' | 'period_start' | 'period_end' | 'filed_at' | 'box4' | 'box7'>;
-const FILED_COLUMNS = 'id,client_id,period_start,period_end,filed_at,box4,box7';
+type FiledRow = Pick<
+  Tables<'filed_quarters'>,
+  'id' | 'client_id' | 'period_start' | 'period_end' | 'filed_at' | 'box1' | 'box4' | 'box6' | 'box7'
+>;
+const FILED_COLUMNS = 'id,client_id,period_start,period_end,filed_at,box1,box4,box6,box7';
 const toFiled = (r: FiledRow): FiledQuarter => ({
   id: r.id,
   clientId: r.client_id,
@@ -240,6 +243,8 @@ const toFiled = (r: FiledRow): FiledQuarter => ({
   filedAt: r.filed_at,
   box4: Number(r.box4),
   box7: Number(r.box7),
+  box1: r.box1 == null ? null : Number(r.box1),
+  box6: r.box6 == null ? null : Number(r.box6),
 });
 
 export async function listFiledQuarters(clientId: string): Promise<FiledQuarter[]> {
@@ -250,7 +255,7 @@ export async function listFiledQuarters(clientId: string): Promise<FiledQuarter[
 export async function fileQuarter(
   clientId: string,
   period: { from: string; to: string },
-  boxes: { box4: number; box7: number },
+  boxes: { box1: number; box4: number; box6: number; box7: number },
 ): Promise<FiledQuarter> {
   const row = checkRow(
     await supabase
@@ -264,6 +269,57 @@ export async function fileQuarter(
 
 export async function unfileQuarter(id: string): Promise<void> {
   check(await supabase.from('filed_quarters').delete().eq('id', id));
+}
+
+// ---------- Income ----------
+type IncomeRow = Pick<
+  Tables<'income'>,
+  'id' | 'client_id' | 'customer' | 'reference' | 'description' | 'net' | 'vat' | 'vat_rate' | 'date' | 'created_at'
+>;
+const INCOME_COLUMNS = 'id,client_id,customer,reference,description,net,vat,vat_rate,date,created_at';
+const toIncome = (r: IncomeRow): Income => ({
+  id: r.id,
+  clientId: r.client_id,
+  customer: r.customer,
+  reference: r.reference ?? undefined,
+  description: r.description ?? undefined,
+  net: Number(r.net),
+  vat: Number(r.vat),
+  vatRate: isVatRate(r.vat_rate) ? r.vat_rate : DEFAULT_VAT_RATE,
+  date: r.date,
+  createdAt: Date.parse(r.created_at),
+});
+
+export async function listIncome(clientId: string): Promise<Income[]> {
+  const rows = check(await supabase.from('income').select(INCOME_COLUMNS).eq('client_id', clientId).order('date', { ascending: false }));
+  return (rows ?? []).map(toIncome);
+}
+
+/** Adds or replaces an income record (also used to undo a delete). */
+export async function upsertIncome(i: Income): Promise<Income> {
+  const row = checkRow(
+    await supabase
+      .from('income')
+      .upsert({
+        id: i.id,
+        client_id: i.clientId,
+        customer: i.customer,
+        reference: i.reference ?? null,
+        description: i.description ?? null,
+        net: i.net,
+        vat: i.vat,
+        vat_rate: i.vatRate,
+        date: i.date,
+        created_at: new Date(i.createdAt).toISOString(),
+      })
+      .select(INCOME_COLUMNS)
+      .single(),
+  );
+  return toIncome(row);
+}
+
+export async function deleteIncome(id: string): Promise<void> {
+  check(await supabase.from('income').delete().eq('id', id));
 }
 
 // ---------- Recurring expenses ----------

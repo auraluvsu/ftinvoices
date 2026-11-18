@@ -4,7 +4,8 @@ import type { Receipt } from '../types';
 import { useAppData } from '../appData';
 import { daysBetween, formatDate, formatMoney, todayIso } from '../lib/format';
 import { sumTotals } from '../lib/receipts';
-import { categoryBreakdown, quarterEndExclusive, recentQuarters, type CategoryTotal } from '../lib/quarters';
+import { categoryBreakdown, quarterEndExclusive, quarterPeriod, recentQuarters, type CategoryTotal } from '../lib/quarters';
+import { vatReturnBoxes } from '../lib/vatReturn';
 import { QuarterChart } from '../components/QuarterChart';
 import { ImageModal } from '../components/ImageModal';
 import { EditReceiptModal } from '../components/EditReceiptModal';
@@ -33,7 +34,7 @@ const MAX_CATEGORIES = 8;
 const TOP_BILLS = 5;
 
 export function HomePage() {
-  const { receipts, stagger, categories: allCategories, categoryColor, saveReceipt, notify, exportList } = useAppData();
+  const { receipts, income, stagger, categories: allCategories, categoryColor, saveReceipt, notify, exportList } = useAppData();
   const [period, setPeriod] = useState<Period>('quarter');
   const [viewing, setViewing] = useState<Receipt | null>(null);
   const [editing, setEditing] = useState<Receipt | null>(null);
@@ -64,6 +65,14 @@ export function HomePage() {
     () => sumTotals(receipts.filter((r) => (yearMode === 'tax' ? taxYearOf(r.date) === taxYear : r.date.startsWith(year)))),
     [receipts, year, yearMode, taxYear],
   );
+
+  // Money in, for profit and the VAT to pay this quarter.
+  const inYear = (date: string) => (yearMode === 'tax' ? taxYearOf(date) === taxYear : date.startsWith(year));
+  const { from: qFrom, to: qTo } = quarterPeriod(current.start);
+  const qIncome = income.filter((i) => i.date >= qFrom && i.date <= qTo);
+  const qSales = qIncome.reduce((n, i) => n + i.net, 0);
+  const qBoxes = vatReturnBoxes(current.receipts, qIncome);
+  const ySales = income.filter((i) => inYear(i.date)).reduce((n, i) => n + i.net, 0);
 
   const periodReceipts = useMemo(
     () =>
@@ -175,6 +184,31 @@ export function HomePage() {
           <small className="muted">Net {formatMoney(ytd.net)}</small>
         </div>
       </div>
+
+      {income.length > 0 && (
+        <div className="tiles">
+          <div className="stat">
+            <span className="muted">Income this quarter</span>
+            <strong>{formatMoney(qSales)}</strong>
+            <small className="muted">Excluding VAT · {qIncome.length} record{qIncome.length === 1 ? '' : 's'}</small>
+          </div>
+          <div className="stat stat-accent">
+            <span className="muted">{qBoxes.box5 >= 0 ? 'VAT to pay this quarter' : 'VAT due back this quarter'}</span>
+            <strong>{formatMoney(Math.abs(qBoxes.box5))}</strong>
+            <small className="muted">VAT charged minus VAT paid so far (Box 5)</small>
+          </div>
+          <div className="stat">
+            <span className="muted">Income in {yearName}</span>
+            <strong>{formatMoney(ySales)}</strong>
+            <small className="muted">Excluding VAT</small>
+          </div>
+          <div className="stat">
+            <span className="muted">Profit in {yearName}</span>
+            <strong>{formatMoney(ySales - ytd.net)}</strong>
+            <small className="muted">Income minus spending, both ex. VAT, before tax</small>
+          </div>
+        </div>
+      )}
 
       <QuarterChart quarters={quarters} stagger={stagger} />
 

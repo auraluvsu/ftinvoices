@@ -124,6 +124,11 @@ export function recentQuarters(
   });
 }
 
+/** A quarter with no receipts (e.g. one that only has income). */
+export function emptyQuarter(start: number, stagger: QuarterStagger): QuarterGroup {
+  return { start, ...describe(start, stagger), receipts: [], months: [0, 1, 2].map((i) => ({ key: absToKey(start + i), receipts: [] })) };
+}
+
 /** First and last day of the quarter starting at absolute month `start`, as YYYY-MM-DD. */
 export function quarterPeriod(start: number): { from: string; to: string } {
   const end = start + 2;

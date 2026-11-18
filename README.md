@@ -1,6 +1,6 @@
 # Bookkeeping
 
-A personal bookkeeping app for recording receipts for one or more clients: totals by month, quarter and year, VAT figures for UK VAT returns, and exports to a spreadsheet, CSV or JSON.
+A personal bookkeeping app for recording receipts and income for one or more clients: totals by month, quarter and year, VAT figures for UK VAT returns, and exports to a spreadsheet, CSV or JSON.
 
 Built with React + TypeScript (Vite), with data stored in Supabase behind Google sign-in.
 
@@ -31,6 +31,7 @@ Built with React + TypeScript (Vite), with data stored in Supabase behind Google
 - UK tax year (6 April – 5 April) totals on the Overview, alongside the calendar year, and an Export period menu for the quarter, year, tax year or all time.
 - Overview page: spend and VAT this quarter and this year, a spend-per-quarter chart, spend by category, and biggest bills.
 - Quarterly review: totals per VAT quarter, change on the previous quarter, month-by-month and category breakdowns, and the VAT return's **Box 4** and **Box 7** with copy buttons.
+- **Income**: record what you've invoiced (customer, invoice number, net, VAT rate and VAT, date) on the Income page, grouped by month with CSV export. It adds profit figures to the overview and the sales side of the VAT return: **Box 1**, **3**, **5** (whether VAT is owed or due back) and **6** appear next to Boxes 4 and 7 in the quarterly review.
 - **Mark a VAT quarter as filed** once its return is submitted. Box 4 and Box 7 are saved as filed, and the quarter's receipts are locked (shown with a padlock, read-only in the editor, and refused by the database) until you unfile it. Moving them to another category is still allowed.
 - **Printable report** for each VAT quarter (Report button in the Quarterly review): summary with Box 4/7, by category, by month and every receipt; print it or save as PDF.
 - Export everything, a month, a filtered view or a quarter as **.xlsx** (summary sheet + per-month sheets), **CSV**, or **JSON** (includes images). Exports carry the client's name and VAT number.
