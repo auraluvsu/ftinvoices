@@ -6,6 +6,7 @@ import { catVar, SUGGESTED_COLORS } from '../lib/color';
 import { supplierMemory } from '../lib/receipts';
 import { urlToDataUrl } from '../lib/image';
 import { scanReceipt } from '../lib/db';
+import { mergeScan } from '../lib/scan';
 import { ImageInput } from './ImageInput';
 import { CategoryColorPicker } from './CategoryColorPicker';
 
@@ -78,18 +79,13 @@ export function ReceiptForm({ categories, editing, onSave, onCancelEdit, onError
     setScanning(true);
     try {
       const r = await scanReceipt(await urlToDataUrl(draft.image), categories);
-      const patch: Partial<Draft> = {};
-      if (r.name && !draft.name.trim()) patch.name = r.name;
-      if (r.total != null && !draft.total.trim()) patch.total = r.total.toFixed(2);
-      if (r.vat != null && !draft.vat.trim()) patch.vat = r.vat.toFixed(2);
-      if (r.date && (!draft.date || draft.date === todayIso())) patch.date = r.date;
-      if (!categoryTouched && draft.category !== NEW_CATEGORY) {
-        // Your own past choice for this supplier beats the model's guess.
-        const remembered = suppliers.get((patch.name ?? draft.name).trim().toLowerCase())?.category;
-        const pick = remembered && categories.includes(remembered) ? remembered : r.category;
-        if (pick && pick !== draft.category) patch.category = pick;
-        if (remembered && pick === remembered) setRemembered(remembered);
-      }
+      const { patch, remembered } = mergeScan(draft, r, {
+        today: todayIso(),
+        categories,
+        keepCategory: categoryTouched || draft.category === NEW_CATEGORY,
+        rememberedCategory: (key) => suppliers.get(key)?.category,
+      });
+      if (remembered) setRemembered(remembered);
       const keys = Object.keys(patch) as (keyof Draft)[];
       if (!keys.length) {
         onError(r.total == null && !r.name ? 'Couldn’t read anything from this image' : 'Nothing new to fill in — the fields are already set');
