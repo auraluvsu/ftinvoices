@@ -3,15 +3,14 @@ import { RouterProvider } from 'react-router/dom';
 import { AppDataProvider } from './store';
 import { AuthGate } from './auth';
 import { Layout } from './Layout';
-import { ReceiptsPage } from './pages/ReceiptsPage';
-import { HomePage } from './pages/HomePage';
 
 const router = createBrowserRouter([
   {
     element: <Layout />,
     children: [
-      { index: true, element: <HomePage /> },
-      { path: 'receipts', element: <ReceiptsPage /> },
+      // Each page loads as its own chunk the first time it's opened.
+      { index: true, lazy: async () => ({ Component: (await import('./pages/HomePage')).HomePage }) },
+      { path: 'receipts', lazy: async () => ({ Component: (await import('./pages/ReceiptsPage')).ReceiptsPage }) },
       { path: '*', element: <Navigate to="/" replace /> },
     ],
   },
