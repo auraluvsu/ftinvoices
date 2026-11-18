@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { supabase, supabaseKey, supabaseUrl } from './supabase';
 import type { Category, Client, Receipt } from '../types';
 import type { QuarterStagger } from './quarters';
 
@@ -163,6 +163,29 @@ export async function uploadImage(path: string, blob: Blob): Promise<void> {
 export async function removeImages(paths: string[]): Promise<void> {
   if (!paths.length) return;
   check(await supabase.storage.from(BUCKET).remove(paths));
+}
+
+// The latest access token, kept so images can be deleted while the page is closing,
+// when there's no time to await getSession().
+let accessToken: string | null = null;
+supabase.auth.onAuthStateChange((_event, session) => {
+  accessToken = session?.access_token ?? null;
+});
+
+/**
+ * Deletes images with a `keepalive` request, which the browser finishes even after the
+ * page has gone (used on `pagehide`). Fire-and-forget: there's no result to wait for.
+ */
+export function removeImagesOnExit(paths: string[]): void {
+  if (!paths.length || !accessToken) return;
+  void fetch(`${supabaseUrl}/storage/v1/object/${BUCKET}`, {
+    method: 'DELETE',
+    keepalive: true,
+    headers: { apikey: supabaseKey, Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prefixes: paths }),
+  }).catch(() => {
+    /* best effort */
+  });
 }
 
 /** Map of path → signed URL. Missing/failed paths are left out. */
