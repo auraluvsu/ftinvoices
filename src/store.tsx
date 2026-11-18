@@ -13,6 +13,7 @@ import { ManageCategoriesModal } from './components/ManageCategoriesModal';
 type Phase = { kind: 'loading' } | { kind: 'error'; message: string } | { kind: 'no-client' } | { kind: 'ready' };
 
 const RESIGN_EVERY_MS = 6 * 60 * 60 * 1000; // well inside the 12h signed-URL lifetime
+const REFRESH_MIN_GAP_MS = 60_000;
 const IMAGE_DELETE_DELAY_MS = 8000; // keep the image until the Undo toast is gone
 
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -106,6 +107,20 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     },
     [],
   );
+
+  // Coming back to the tab: pick up changes made on other devices (at most once a minute).
+  useEffect(() => {
+    if (phase.kind !== 'ready') return;
+    let last = Date.now();
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible' || Date.now() - last < REFRESH_MIN_GAP_MS) return;
+      last = Date.now();
+      // Stay on this tab's client even if another tab switched (the choice is shared via localStorage).
+      void fetchBooks(clientId ?? undefined, { silent: true });
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [phase.kind, fetchBooks, clientId]);
 
   useEffect(() => {
     // Initial load from Supabase; state is only set after the awaited network calls.
@@ -264,7 +279,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
           if (uploadedPath) db.removeImages([uploadedPath]).catch(console.error);
           if (e instanceof db.ReceiptConflictError) {
             // Load the newer version; the form stays open, so saving again overwrites it on purpose.
-            void fetchBooks(undefined, { silent: true });
+            void fetchBooks(client.id, { silent: true });
             notify(`${e.message}. The latest version is loaded — save again to replace it.`, 'error');
             return false;
           }
