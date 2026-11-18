@@ -85,12 +85,26 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const reload = useCallback(
-    (preferredId?: string) => {
-      setPhase({ kind: 'loading' });
-      return fetchBooks(preferredId);
+    (preferredId?: string, opts: { silent?: boolean } = {}) => {
+      if (!opts.silent) setPhase({ kind: 'loading' });
+      return fetchBooks(preferredId, opts);
     },
     [fetchBooks],
   );
+
+  // Coming back to the tab: pick up changes made on other devices (at most once a minute).
+  useEffect(() => {
+    if (phase.kind !== 'ready') return;
+    let last = Date.now();
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible' || Date.now() - last < REFRESH_MIN_GAP_MS) return;
+      last = Date.now();
+      // Stay on this tab's client even if another tab switched (the choice is shared via localStorage).
+      void reload(clientId ?? undefined, { silent: true });
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [phase.kind, reload, clientId]);
 
   const createClient = useCallback(
     async (c: Omit<Client, 'id'>) => {
@@ -107,20 +121,6 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     },
     [],
   );
-
-  // Coming back to the tab: pick up changes made on other devices (at most once a minute).
-  useEffect(() => {
-    if (phase.kind !== 'ready') return;
-    let last = Date.now();
-    const onVisible = () => {
-      if (document.visibilityState !== 'visible' || Date.now() - last < REFRESH_MIN_GAP_MS) return;
-      last = Date.now();
-      // Stay on this tab's client even if another tab switched (the choice is shared via localStorage).
-      void fetchBooks(clientId ?? undefined, { silent: true });
-    };
-    document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
-  }, [phase.kind, fetchBooks, clientId]);
 
   useEffect(() => {
     // Initial load from Supabase; state is only set after the awaited network calls.
@@ -279,7 +279,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
           if (uploadedPath) db.removeImages([uploadedPath]).catch(console.error);
           if (e instanceof db.ReceiptConflictError) {
             // Load the newer version; the form stays open, so saving again overwrites it on purpose.
-            void fetchBooks(client.id, { silent: true });
+            void reload(client.id, { silent: true });
             notify(`${e.message}. The latest version is loaded — save again to replace it.`, 'error');
             return false;
           }
@@ -325,7 +325,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       },
       notify,
     };
-  }, [client, clients, reload, stored, receipts, categories, categoryList, categoryColor, userId, notify, fetchBooks]);
+  }, [client, clients, reload, stored, receipts, categories, categoryList, categoryColor, userId, notify]);
 
   if (phase.kind !== 'ready' || !value) {
     return (
