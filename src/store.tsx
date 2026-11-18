@@ -47,11 +47,11 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const client = clients.find((c) => c.id === clientId) ?? null;
   const [categoryList, setCategoryList] = useState<Category[]>([]);
   const [stored, setStored] = useState<db.StoredReceipt[]>([]);
+  /** Images of deleted receipts waiting out the Undo window: path → timer (one mutable Map for the provider's life). */
+  const [pendingDeletes] = useState(() => new Map<string, ReturnType<typeof setTimeout>>());
   const [urls, setUrls] = useState<Map<string, string>>(() => new Map());
   const [toast, setToast] = useState<Toast | null>(null);
   const storedRef = useRef(stored);
-  /** Images of deleted receipts waiting out the Undo window: path → timer (one mutable Map for the provider's life). */
-  const [pendingDeletes] = useState(() => new Map<string, ReturnType<typeof setTimeout>>());
   useEffect(() => {
     storedRef.current = stored;
   }, [stored]);
@@ -107,12 +107,6 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
-  useEffect(() => {
-    // Initial load from Supabase; state is only set after the awaited network calls.
-    // oxlint-disable-next-line react/set-state-in-effect
-    void fetchBooks();
-  }, [fetchBooks]);
-
   /** Deletes an image after the Undo window, unless cancelImageDelete is called first. */
   const scheduleImageDelete = useCallback((path: string) => {
     const timer = setTimeout(() => {
@@ -138,6 +132,12 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     window.addEventListener('pagehide', flush);
     return () => window.removeEventListener('pagehide', flush);
   }, [pendingDeletes]);
+
+  useEffect(() => {
+    // Initial load from Supabase; state is only set after the awaited network calls.
+    // oxlint-disable-next-line react/set-state-in-effect
+    void fetchBooks();
+  }, [fetchBooks]);
 
   // Signed URLs expire; refresh them periodically while the app stays open.
   useEffect(() => {
