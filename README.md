@@ -52,9 +52,9 @@ The app needs a Supabase project first. See [docs/NEXT-STEPS.md](docs/NEXT-STEPS
 |---|---|
 | `npm run dev` | Start the dev server (http://localhost:5173) |
 | `npm run build` | Type-check and build to `dist/` |
+| `npm run gen:types` | Regenerate `src/lib/database.types.ts` from Supabase (set `SUPABASE_PROJECT_REF`, after `npx supabase login`) |
 | `npm run preview` | Serve the production build locally |
 | `npm run lint` | Lint with oxlint |
-| `npm run gen:types` | Regenerate `src/lib/database.types.ts` from Supabase (set `SUPABASE_PROJECT_REF`, after `npx supabase login`) |
 
 ## Project layout
 

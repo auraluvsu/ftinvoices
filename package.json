@@ -6,9 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "gen:types": "npx supabase gen types typescript --project-id \"$SUPABASE_PROJECT_REF\" --schema public > src/lib/database.types.ts",
     "lint": "oxlint",
-    "preview": "vite preview",
-    "gen:types": "supabase gen types typescript --project-id \"$SUPABASE_PROJECT_REF\" --schema public > src/lib/database.types.ts"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.119.0",
