@@ -30,6 +30,7 @@ interface ReceiptRow {
   date: string;
   image_path: string | null;
   created_at: string;
+  updated_at: string;
 }
 
 const toClient = (r: ClientRow): Client => ({
@@ -53,6 +54,7 @@ export const toStoredReceipt = (r: ReceiptRow): StoredReceipt => ({
   date: r.date,
   imagePath: r.image_path ?? undefined,
   createdAt: Date.parse(r.created_at),
+  updatedAt: r.updated_at,
 });
 
 const fromStoredReceipt = (r: StoredReceipt) => ({
@@ -125,11 +127,13 @@ export async function reassignReceipts(clientId: string, fromId: string, toId: s
 }
 
 // ---------- Receipts ----------
+const RECEIPT_COLUMNS = 'id,client_id,category_id,name,total,vat,date,image_path,created_at,updated_at';
+
 export async function listReceipts(clientId: string): Promise<StoredReceipt[]> {
   const rows = check(
     await supabase
       .from('receipts')
-      .select('id,client_id,category_id,name,total,vat,date,image_path,created_at')
+      .select(RECEIPT_COLUMNS)
       .eq('client_id', clientId)
       .order('date', { ascending: false }),
   );
@@ -141,7 +145,7 @@ export async function upsertReceipt(r: StoredReceipt): Promise<StoredReceipt> {
     await supabase
       .from('receipts')
       .upsert(fromStoredReceipt(r))
-      .select('id,client_id,category_id,name,total,vat,date,image_path,created_at')
+      .select(RECEIPT_COLUMNS)
       .single(),
   );
   return toStoredReceipt(row as ReceiptRow);
