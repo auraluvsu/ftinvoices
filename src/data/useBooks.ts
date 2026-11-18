@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { Category, Client, FiledQuarter } from '../types';
+import type { Category, Client, FiledQuarter, RecurringExpense } from '../types';
 import * as db from '../lib/db';
 
 export type Phase = { kind: 'loading' } | { kind: 'error'; message: string } | { kind: 'no-client' } | { kind: 'ready' };
@@ -36,6 +36,7 @@ export function useBooks(onSigned: (urls: Map<string, string>) => void) {
   const [categoryList, setCategoryList] = useState<Category[]>([]);
   const [stored, setStored] = useState<db.StoredReceipt[]>([]);
   const [filed, setFiled] = useState<FiledQuarter[]>([]);
+  const [recurring, setRecurring] = useState<RecurringExpense[]>([]);
   const client = clients.find((c) => c.id === clientId) ?? null;
 
   /** Fetches everything, then applies it in one go (state is only set after the network calls). */
@@ -47,10 +48,11 @@ export function useBooks(onSigned: (urls: Map<string, string>) => void) {
         if (!all.length) return setPhase({ kind: 'no-client' });
         const want = preferredId ?? readClientId();
         const c = all.find((x) => x.id === want) ?? all[0];
-        const [cats, recs, fq] = await Promise.all([
+        const [cats, recs, fq, rec] = await Promise.all([
           db.listCategories(c.id),
           db.listReceipts(c.id),
           db.listFiledQuarters(c.id),
+          db.listRecurring(c.id),
         ]);
         const signed = await db.signImages(recs.flatMap((r) => (r.imagePath ? [r.imagePath] : [])));
         saveClientId(c.id);
@@ -59,6 +61,7 @@ export function useBooks(onSigned: (urls: Map<string, string>) => void) {
         setCategoryList(cats);
         setStored(recs);
         setFiled(fq);
+        setRecurring(rec);
         onSigned(signed);
         setPhase({ kind: 'ready' });
       } catch (e) {
@@ -97,5 +100,5 @@ export function useBooks(onSigned: (urls: Map<string, string>) => void) {
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [phase.kind, reload, clientId]);
 
-  return { phase, clients, setClients, client, categoryList, setCategoryList, stored, setStored, filed, setFiled, reload };
+  return { phase, clients, setClients, client, categoryList, setCategoryList, stored, setStored, filed, setFiled, recurring, setRecurring, reload };
 }

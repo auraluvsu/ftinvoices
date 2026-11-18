@@ -21,7 +21,14 @@ function setup() {
   const cats = testState<Category[]>([fuel, travel]);
   const recs = testState<StoredReceipt[]>([receipt]);
   const notify = vi.fn();
-  const actions = categoryActions({ clientId: 'k', categoryList: cats.get(), setCategoryList: cats.set, setStored: recs.set, notify });
+  const actions = categoryActions({
+    clientId: 'k',
+    categoryList: cats.get(),
+    setCategoryList: cats.set,
+    setStored: recs.set,
+    setRecurring: () => {},
+    notify,
+  });
   return { cats, recs, notify, actions };
 }
 
