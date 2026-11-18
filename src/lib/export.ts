@@ -1,4 +1,4 @@
-import type { Receipt } from '../types';
+import type { Income, Receipt } from '../types';
 import { urlToDataUrl } from './image';
 import { formatMonthKey, round2, todayIso } from './format';
 import { groupByMonth, groupByYear, sumTotals } from './receipts';
@@ -179,3 +179,26 @@ export async function exportReceipts(receipts: Receipt[], format: ExportFormat, 
   else if (format === 'json') await exportJson(sorted, base, meta);
   else await exportXlsx(sorted, base, meta);
 }
+
+/** Income as CSV, oldest first, with a total row. */
+export function incomeCsv(income: Income[]): string {
+  const rows = [...income].sort((a, b) => a.date.localeCompare(b.date));
+  const lines = [
+    ['Date', 'Customer', 'Invoice no.', 'Description', 'Net', 'VAT', 'Total', 'VAT rate'].join(','),
+    ...rows.map((i) =>
+      [i.date, i.customer, i.reference ?? '', i.description ?? '', round2(i.net), round2(i.vat), round2(i.net + i.vat), vatRateInfo(i.vatRate).short]
+        .map(csvCell)
+        .join(','),
+    ),
+  ];
+  const net = rows.reduce((n, i) => n + i.net, 0);
+  const vat = rows.reduce((n, i) => n + i.vat, 0);
+  lines.push(['', 'TOTAL', '', '', round2(net), round2(vat), round2(net + vat), ''].map(csvCell).join(','));
+  return '\uFEFF' + lines.join('\r\n');
+}
+
+export function exportIncome(income: Income[], label: string, meta?: ExportMeta) {
+  const base = [meta && slug(meta.client), label, todayIso()].filter(Boolean).join('-');
+  download(new Blob([incomeCsv(income)], { type: 'text/csv;charset=utf-8' }), `${base}.csv`);
+}
+

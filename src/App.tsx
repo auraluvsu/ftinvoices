@@ -11,6 +11,7 @@ const router = createBrowserRouter([
       // Each page loads as its own chunk the first time it's opened.
       { index: true, lazy: async () => ({ Component: (await import('./pages/HomePage')).HomePage }) },
       { path: 'receipts', lazy: async () => ({ Component: (await import('./pages/ReceiptsPage')).ReceiptsPage }) },
+      { path: 'income', lazy: async () => ({ Component: (await import('./pages/IncomePage')).IncomePage }) },
       { path: '*', element: <Navigate to="/" replace /> },
       // Printable report for a date range (see ReportPage); loaded on demand.
       { path: 'report', lazy: async () => ({ Component: (await import('./pages/ReportPage')).ReportPage }) },

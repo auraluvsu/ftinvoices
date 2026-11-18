@@ -9,6 +9,7 @@ import { RecurringDueBanner } from './components/RecurringDueBanner';
 const NAV = [
   { to: '/', label: 'Overview' },
   { to: '/receipts', label: 'Receipts' },
+  { to: '/income', label: 'Income' },
 ];
 
 export function Layout() {
