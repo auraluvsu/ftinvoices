@@ -34,7 +34,7 @@ npx supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
 npx supabase functions deploy scan-receipt
 ```
 
-JWT verification is left on, so only signed-in users can call the function. If a request is declined by a safety classifier, it is retried on Anthropic's recommended fallback model (`fallbacks: "default"`).
+Only signed-in users can use it: the function checks your Supabase session itself. The gateway's older JWT check is turned off in [`config.toml`](config.toml), because it can reject valid sign-ins on projects using the new publishable keys. If you deploy from somewhere without that file, add `--no-verify-jwt`. If a request is declined by a safety classifier, it is retried on Anthropic's recommended fallback model (`fallbacks: "default"`).
 
 Until the function is deployed, **Read receipt** says it isn't set up the first time it's clicked, then hides itself for the rest of the browser session. To hide it completely, set `VITE_SCAN_ENABLED=false` in `.env.local` (and in your host's environment variables).
 
