@@ -71,6 +71,24 @@ VAT quarters that have been filed with HMRC. Receipts dated inside one are locke
 | `period_start`, `period_end` | date | First and last day of the quarter. One row per client and quarter |
 | `filed_at` | timestamptz | When it was marked as filed |
 | `box4`, `box7` | numeric | The Box 4 (VAT reclaimed) and Box 7 (net purchases, whole pounds) figures at the time of filing |
+| `box1`, `box6` | numeric | Box 1 (VAT on sales) and Box 6 (net sales, whole pounds) at the time of filing; null for quarters filed before income was recorded |
+
+### `income`
+Money in: sales and fees, entered from your own invoices.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id`, `user_id`, `client_id` | uuid | As for receipts; deleted with the client |
+| `customer` | text | Who paid, required |
+| `reference` | text | Invoice number or similar, optional |
+| `description` | text | Optional |
+| `net` | numeric(12,2) | Amount before VAT, ≥ 0 |
+| `vat` | numeric(12,2) | VAT charged, ≥ 0; must be 0 unless `vat_rate` is `standard` or `reduced` |
+| `vat_rate` | text | As for receipts; `outside` means outside the scope of VAT (left out of Box 6) |
+| `date` | date | Invoice or payment date, whichever your VAT accounting uses |
+| `created_at`, `updated_at` | timestamptz | `updated_at` is set by the `income_touch` trigger |
+
+Index: `(client_id, date desc)`. Locked in filed quarters by the `income_filed_guard` trigger, like receipts.
 
 ### `recurring_expenses`
 Regular bills (subscriptions, phone, rent). When one is due, the app offers it for review; nothing is added on its own.
@@ -107,7 +125,7 @@ Regular bills (subscriptions, phone, rent). When one is due, the app offers it f
 RLS is enabled on every table, so every query only sees rows owned by the signed-in user:
 
 - `clients`: `user_id = auth.uid()` for reading and writing.
-- `categories`, `receipts`, `filed_quarters` and `recurring_expenses`: `user_id = auth.uid()`, and on insert/update the `client_id` must be one of the user's own clients.
+- `categories`, `receipts`, `filed_quarters`, `recurring_expenses` and `income`: `user_id = auth.uid()`, and on insert/update the `client_id` must be one of the user's own clients.
 
 Signed-out requests (publishable key with no session) see nothing.
 

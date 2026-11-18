@@ -80,6 +80,8 @@ create table public.filed_quarters (
   filed_at     timestamptz not null default now(),
   box4         numeric(12,2) not null,     -- VAT reclaimed, as filed
   box7         numeric(12,0) not null,     -- net purchases in whole pounds, as filed
+  box1         numeric(12,2),              -- VAT on sales, as filed (null if filed before income was recorded)
+  box6         numeric(12,0),              -- net sales in whole pounds, as filed
   check (period_end > period_start),
   unique (client_id, period_start)
 );
@@ -151,6 +153,61 @@ create policy "own recurring expenses" on public.recurring_expenses for all
   using (user_id = auth.uid())
   with check (user_id = auth.uid()
     and exists (select 1 from public.clients c where c.id = client_id and c.user_id = auth.uid()));
+
+-- ===== Income (sales) =====
+create table public.income (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null default auth.uid() references auth.users on delete cascade,
+  client_id   uuid not null references public.clients on delete cascade,
+  customer    text not null check (length(trim(customer)) > 0),
+  reference   text,                             -- invoice number or similar
+  description text,
+  net         numeric(12,2) not null check (net >= 0),
+  vat         numeric(12,2) not null default 0 check (vat >= 0),
+  -- standard 20%, reduced 5%, zero-rated, exempt, or outside the scope of VAT
+  vat_rate    text not null default 'standard'
+              check (vat_rate in ('standard', 'reduced', 'zero', 'exempt', 'outside')),
+  date        date not null,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+  check (vat_rate in ('standard', 'reduced') or vat = 0)
+);
+create index income_client_date_idx on public.income (client_id, date desc);
+
+create trigger income_touch before update on public.income
+  for each row execute function public.touch_updated_at();
+
+alter table public.income enable row level security;
+
+create policy "own income" on public.income for all
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid()
+    and exists (select 1 from public.clients c where c.id = client_id and c.user_id = auth.uid()));
+
+-- Income in a filed VAT quarter is locked too (same rule as receipts).
+create function public.guard_filed_income() returns trigger
+language plpgsql security invoker as $$
+begin
+  if tg_op = 'DELETE' and not exists (select 1 from public.clients where id = old.client_id) then
+    return old;
+  end if;
+  if tg_op in ('UPDATE', 'DELETE') and exists (
+       select 1 from public.filed_quarters f
+       where f.client_id = old.client_id and old.date between f.period_start and f.period_end) then
+    raise exception 'This income is in a filed VAT quarter. Unfile the quarter to change it.'
+      using errcode = 'P0001';
+  end if;
+  if tg_op in ('INSERT', 'UPDATE') and exists (
+       select 1 from public.filed_quarters f
+       where f.client_id = new.client_id and new.date between f.period_start and f.period_end) then
+    raise exception 'That date is in a filed VAT quarter. Unfile the quarter to add income to it.'
+      using errcode = 'P0001';
+  end if;
+  return coalesce(new, old);
+end $$;
+
+create trigger income_filed_guard before insert or update or delete on public.income
+  for each row execute function public.guard_filed_income();
 
 -- ===== Row-level security: you only ever see your own rows =====
 alter table public.clients    enable row level security;

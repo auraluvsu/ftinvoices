@@ -5,7 +5,7 @@ One-time setup for the bookkeeping app's backend.
 ## 1. Database and storage
 Supabase dashboard → **SQL Editor** → New query → paste [`schema.sql`](schema.sql) → **Run**.
 
-This creates `clients`, `categories`, `receipts`, `filed_quarters` and `recurring_expenses` (row-level security on all of them) plus a private `receipts` storage bucket. A signed-in user can only ever read or write their own rows and files.
+This creates `clients`, `categories`, `receipts`, `filed_quarters`, `recurring_expenses` and `income` (row-level security on all of them) plus a private `receipts` storage bucket. A signed-in user can only ever read or write their own rows and files.
 
 ### Updating an existing database
 `schema.sql` always describes the whole, current schema, so a new project only ever runs that. Changes to a database that's already live come as numbered files in [`migrations/`](migrations/). When a pull request adds one, paste it into the SQL Editor and run it **before** merging, since the new app code expects the new columns. Each migration is safe to run twice.
@@ -15,6 +15,7 @@ This creates `clients`, `categories`, `receipts`, `filed_quarters` and `recurrin
 | `20261118120000_vat_rate.sql` | `receipts.vat_rate` (20% / 5% / 0% / exempt / outside the scope) |
 | `20261118130000_filed_quarters.sql` | `filed_quarters` table and the trigger that locks receipts in filed quarters |
 | `20261118140000_recurring_expenses.sql` | `recurring_expenses` table |
+| `20261118150000_income.sql` | `income` table (locked in filed quarters like receipts), and Box 1 / Box 6 on `filed_quarters` |
 
 ## 2. Google sign-in
 1. Google Cloud Console → APIs & Services → **OAuth consent screen** (External, add your email as a test user), then **Credentials → Create credentials → OAuth client ID** → *Web application*.
