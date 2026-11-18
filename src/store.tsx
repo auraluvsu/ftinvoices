@@ -220,6 +220,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       switchClient: (id) => {
         if (id !== client.id) void reload(id);
       },
+      reloadBooks: () => reload(client.id),
       openClientSettings: (mode = 'edit') => setSettings(mode),
       receipts,
       categories,
