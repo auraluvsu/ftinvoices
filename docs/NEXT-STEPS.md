@@ -8,7 +8,7 @@ The code is complete, but it hasn't been run against a real Supabase project, Go
 - [ ] **Google OAuth client.** Google Cloud Console → OAuth consent screen + Credentials → OAuth client ID (Web). Redirect URI: `https://<project-ref>.supabase.co/auth/v1/callback`.
 - [ ] **Enable Google in Supabase.** Authentication → Sign In / Providers → Google → paste the client ID and secret.
 - [ ] **Redirect URLs.** Authentication → URL Configuration → add `http://localhost:5173` and your production URL.
-- [ ] **Environment.** `cp .env.example .env.local`, then fill in `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (Project Settings → API). Use the anon key only, never `service_role`.
+- [ ] **Environment.** Create `.env.local` with `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` (Project Settings → API Keys). Use the publishable key (`sb_publishable_…`) only, never the secret key. An older `VITE_SUPABASE_ANON_KEY` entry still works.
 - [ ] **First sign-in.** `npm run dev` → Continue with Google → name your first client.
 - [ ] **Lock down sign-ups.** After that first sign-in, turn off *Allow new users to sign up*.
 - [ ] **Receipt scanning (optional).**

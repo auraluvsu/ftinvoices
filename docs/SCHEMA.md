@@ -80,7 +80,7 @@ RLS is enabled on all three tables, so every query only sees rows owned by the s
 - `clients`: `user_id = auth.uid()` for reading and writing.
 - `categories` and `receipts`: `user_id = auth.uid()`, and on insert/update the `client_id` must be one of the user's own clients.
 
-Signed-out requests (anon key with no session) see nothing.
+Signed-out requests (publishable key with no session) see nothing.
 
 ## Image storage
 

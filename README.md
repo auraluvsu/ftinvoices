@@ -43,8 +43,15 @@ Built with React + TypeScript (Vite), with data stored in Supabase behind Google
 
 ```sh
 npm install
-cp .env.example .env.local   # then fill in your Supabase URL and anon key
+# create .env.local with VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY (see below)
 npm run dev
+```
+
+`.env.local` (never committed):
+
+```
+VITE_SUPABASE_URL=https://<project-ref>.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 ```
 
 The app needs a Supabase project first. See [docs/NEXT-STEPS.md](docs/NEXT-STEPS.md) for the setup checklist and [docs/SCHEMA.md](docs/SCHEMA.md) for the database design.
@@ -88,7 +95,7 @@ docs/
 ## Security
 
 - Every table and every image file is limited to the signed-in user by row-level security.
-- Only the Supabase **anon** key is used in the browser; the `service_role` key is never needed.
+- Only the Supabase **publishable** key (`sb_publishable_…`, formerly "anon") is used in the browser; the **secret** key (`sb_secret_…`, formerly `service_role`) is never needed.
 - The Anthropic API key is a Supabase secret, used only by the Edge Function.
 - After your first sign-in, turn off new sign-ups in Supabase so nobody else can create an account.
 

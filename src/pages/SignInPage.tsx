@@ -30,7 +30,7 @@ export function SignInPage({ notConfigured }: { notConfigured?: boolean }) {
         <h1>Bookkeeping</h1>
         {notConfigured ? (
           <p className="muted">
-            Supabase isn’t configured. Add <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> to{' '}
+            Supabase isn’t configured. Add <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_PUBLISHABLE_KEY</code> to{' '}
             <code>.env.local</code>, then restart the dev server.
           </p>
         ) : (
