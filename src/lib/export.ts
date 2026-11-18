@@ -2,10 +2,11 @@ import type { Receipt } from '../types';
 import { urlToDataUrl } from './image';
 import { formatMonthKey, round2, todayIso } from './format';
 import { groupByMonth, groupByYear, sumTotals } from './receipts';
+import { vatRateInfo } from './vatRates';
 
 export type ExportFormat = 'xlsx' | 'csv' | 'json' | 'zip';
 
-const HEADERS = ['Date', 'Name', 'Category', 'Total', 'VAT', 'Net', 'Has image'] as const;
+const HEADERS = ['Date', 'Name', 'Category', 'Total', 'VAT', 'Net', 'VAT rate', 'Has image'] as const;
 
 const toRow = (r: Receipt) => [
   r.date,
@@ -14,6 +15,7 @@ const toRow = (r: Receipt) => [
   round2(r.total),
   round2(r.vat),
   round2(r.total - r.vat),
+  vatRateInfo(r.vatRate).short,
   r.image ? 'Yes' : 'No',
 ];
 
@@ -100,6 +102,7 @@ async function exportJson(receipts: Receipt[], base: string, meta?: ExportMeta) 
         category: r.category,
         total: r.total,
         vat: r.vat,
+        vatRate: r.vatRate,
         createdAt: new Date(r.createdAt).toISOString(),
         // Embed images so the export is self-contained (signed URLs expire).
         image: r.image ? await urlToDataUrl(r.image) : undefined,
@@ -121,7 +124,7 @@ async function exportXlsx(receipts: Receipt[], base: string, meta?: ExportMeta) 
       [],
       ['', 'TOTAL', '', round2(t.total), round2(t.vat), round2(t.net)],
     ]);
-    ws['!cols'] = [{ wch: 12 }, { wch: 32 }, { wch: 18 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 10 }];
+    ws['!cols'] = [{ wch: 12 }, { wch: 32 }, { wch: 18 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 10 }];
     // Currency format on numeric columns.
     for (let r = 1; r <= rows.length + 2; r++) {
       for (const c of [3, 4, 5]) {
