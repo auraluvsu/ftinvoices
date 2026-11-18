@@ -167,6 +167,11 @@ kbd {
 .btn-ghost:hover:not(:disabled), .btn-ghost.active { background: var(--surface-2); color: var(--text); }
 .btn-ghost.active { color: var(--accent-text); }
 .btn-ghost.danger:hover { background: var(--danger-soft); color: var(--danger); }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover:not(:disabled) { filter: brightness(1.08); }
+.danger-note { margin: 0; padding: 10px 12px; font-size: .9rem; border-radius: var(--radius-sm); background: var(--danger-soft); }
+.backup-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; }
+.menu-list button.danger { color: var(--danger); }
 .btn-sm { height: 32px; padding: 0 10px; font-size: .9rem; }
 .btn-icon { width: 34px; height: 34px; padding: 0; }
 .btn-block { width: 100%; height: 44px; }
