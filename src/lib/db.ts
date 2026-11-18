@@ -96,6 +96,23 @@ export async function updateClient(id: string, patch: Partial<Omit<Client, 'id'>
   check(await supabase.from('clients').update(row).eq('id', id));
 }
 
+/**
+ * Deletes a client for good: first every photo in its storage folder, then the client row
+ * (the database removes its categories and receipts with it).
+ */
+export async function deleteClient(userId: string, clientId: string): Promise<void> {
+  const folder = `${userId}/${clientId}`;
+  const PAGE = 1000;
+  // Always list from offset 0: each pass removes what it found, so the next pass sees the rest.
+  for (;;) {
+    const items = check(await supabase.storage.from(BUCKET).list(folder, { limit: PAGE })) ?? [];
+    const paths = items.filter((it) => it.id).map((it) => `${folder}/${it.name}`);
+    if (paths.length) check(await supabase.storage.from(BUCKET).remove(paths));
+    if (items.length < PAGE) break;
+  }
+  check(await supabase.from('clients').delete().eq('id', clientId));
+}
+
 // ---------- Categories ----------
 export async function listCategories(clientId: string): Promise<Category[]> {
   const rows = check(await supabase.from('categories').select('id,client_id,name,color').eq('client_id', clientId));
