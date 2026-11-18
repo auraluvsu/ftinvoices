@@ -33,3 +33,13 @@ export const newId = () =>
 /** Compact money for axis ticks: £0, £850, £1.2k, £15k. */
 export const formatMoneyShort = (n: number) =>
   n >= 1000 ? `£${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, '')}k` : `£${Math.round(n)}`;
+
+/**
+ * Whole calendar days from `from` to `to` (local dates). Uses UTC day numbers so the
+ * 23- and 25-hour days at the clock changes don't shift the count.
+ */
+export const daysBetween = (from: Date, to: Date) =>
+  Math.round(
+    (Date.UTC(to.getFullYear(), to.getMonth(), to.getDate()) - Date.UTC(from.getFullYear(), from.getMonth(), from.getDate())) /
+      86_400_000,
+  );
