@@ -15,14 +15,14 @@ This creates `clients`, `categories` and `receipts` (row-level security on all t
 4. After you've signed in once, turn off **Allow new users to sign up** (Authentication → Sign In / Providers). Then nobody else can create an account.
 
 ## 3. App environment
-Copy `.env.example` to `.env.local` and fill in the values from **Project Settings → API**:
+Create `.env.local` in the project root with the values from **Project Settings → API Keys**:
 
 ```
 VITE_SUPABASE_URL=https://<project-ref>.supabase.co
-VITE_SUPABASE_ANON_KEY=<anon / publishable key>
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 ```
 
-Only the anon (publishable) key belongs in the browser. **Never use the `service_role` key here.**
+Only the publishable key belongs in the browser. **Never use the secret key (`sb_secret_…`, formerly `service_role`) here.** If your `.env.local` or host still has `VITE_SUPABASE_ANON_KEY` from before, it keeps working; rename it when convenient.
 
 ## 4. Receipt scanning (optional)
 The "Read receipt" button calls the `scan-receipt` Edge Function, which sends the photo to Claude (`claude-opus-5-5`, low effort). Your Anthropic API key stays on the server. Each scan costs roughly 1–2p.
