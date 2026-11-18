@@ -1,0 +1,21 @@
+{
+  "name": "Bookkeeping",
+  "short_name": "Bookkeeping",
+  "description": "Receipts, VAT quarters and exports for your clients.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f6f1e4",
+  "theme_color": "#f6f1e4",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ],
+  "shortcuts": [
+    { "name": "Add receipt", "short_name": "Add", "url": "/receipts", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Overview", "url": "/", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

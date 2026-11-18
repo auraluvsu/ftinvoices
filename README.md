@@ -35,6 +35,7 @@ Built with React + TypeScript (Vite), with data stored in Supabase behind Google
 **General**
 - Light (cream + mint) and dark (charcoal + jade) themes, following the system or set by hand.
 - Works on phones; respects "reduce motion".
+- **Installable**: "Add to Home Screen" (iPhone/Android) or "Install app" (Chrome/Edge) opens it in its own window with the receipt icon; adding a photo on a phone opens the camera.
 
 ## Tech stack
 
