@@ -4,7 +4,6 @@ import { AppDataContext as Ctx, type AppData } from './appData';
 import { useAuth } from './authContext';
 import { exportReceipts } from './lib/export';
 import { fallbackColor } from './lib/color';
-import { dataUrlToBlob } from './lib/image';
 import * as db from './lib/db';
 import { BootScreen } from './components/BootScreen';
 import { ClientSettingsModal } from './components/ClientSettingsModal';
@@ -13,9 +12,9 @@ import { ManageCategoriesModal } from './components/ManageCategoriesModal';
 import { ToastView } from './components/ToastView';
 import { useToasts } from './data/useToasts';
 import { useBooks } from './data/useBooks';
+import { categoryActions } from './data/categoryActions';
+import { receiptActions } from './data/receiptActions';
 import { useReceiptImages, useResignImages } from './data/useReceiptImages';
-
-const IMAGE_DELETE_DELAY_MS = 8000; // matches useReceiptImages; bulk delete keeps its own timer
 
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -92,181 +91,23 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       categoryList,
       categoryColor,
       openCategoryManager: () => setManagingCategories(true),
-      addCategory: async (name, color) => {
-        try {
-          const created = await db.insertCategory(client.id, name, color);
-          setCategoryList((prev) => [...prev, created]);
-          return true;
-        } catch (e) {
-          notify(`Couldn’t add category: ${errMsg(e)}`, 'error');
-          return false;
-        }
-      },
-      updateCategory: async (id, patch) => {
-        const before = categoryList;
-        setCategoryList((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
-        try {
-          await db.updateCategory(id, patch);
-          return true;
-        } catch (e) {
-          setCategoryList(before);
-          notify(`Couldn’t update category: ${errMsg(e)}`, 'error');
-          return false;
-        }
-      },
-      mergeCategory: async (fromId, toId) => {
-        try {
-          await db.reassignReceipts(client.id, fromId, toId);
-          setStored((prev) => prev.map((r) => (r.categoryId === fromId ? { ...r, categoryId: toId } : r)));
-          await db.deleteCategory(fromId);
-          setCategoryList((prev) => prev.filter((c) => c.id !== fromId));
-          return true;
-        } catch (e) {
-          notify(`Couldn’t merge: ${errMsg(e)}`, 'error');
-          return false;
-        }
-      },
-      deleteCategory: async (id) => {
-        try {
-          await db.deleteCategory(id);
-          setCategoryList((prev) => prev.filter((c) => c.id !== id));
-          return true;
-        } catch (e) {
-          notify(`Couldn’t delete category: ${errMsg(e)}`, 'error');
-          return false;
-        }
-      },
+      ...categoryActions({ clientId: client.id, categoryList, setCategoryList, setStored, notify }),
       stagger: client.stagger,
 
-      saveReceipt: async (draft, newCategory) => {
-        const existing = stored.find((r) => r.id === draft.id);
-        let uploadedPath: string | undefined;
-        try {
-          // 1. Category (create it first if new)
-          let category = categoryList.find((c) => c.name === draft.category);
-          if (newCategory) {
-            category = await db.insertCategory(client.id, newCategory.name, newCategory.color);
-            const created = category;
-            setCategoryList((prev) => [...prev, created]);
-          }
-          if (!category) throw new Error(`Unknown category “${draft.category}”`);
-
-          // 2. Image: upload a new one, keep the old one, or drop it
-          let imagePath = existing?.imagePath;
-          const isNewImage = draft.image?.startsWith('data:');
-          if (isNewImage) {
-            uploadedPath = db.imagePathFor(userId, client.id, draft.id);
-            await db.uploadImage(uploadedPath, await dataUrlToBlob(draft.image!));
-            imagePath = uploadedPath;
-          } else if (!draft.image) {
-            imagePath = undefined;
-          }
-
-          // 3. Row. Edits only apply if nobody changed the receipt elsewhere meanwhile.
-          const row: db.StoredReceipt = {
-            id: draft.id,
-            clientId: client.id,
-            categoryId: category.id,
-            name: draft.name,
-            total: draft.total,
-            vat: draft.vat,
-            date: draft.date,
-            imagePath,
-            createdAt: existing?.createdAt ?? Date.now(),
-          };
-          const saved = existing?.updatedAt ? await db.updateReceipt(row, existing.updatedAt) : await db.upsertReceipt(row);
-
-          // Show the freshly uploaded image straight from memory; no need to sign it yet.
-          if (isNewImage && imagePath) showLocal(imagePath, draft.image!);
-          setStored((prev) => (existing ? prev.map((r) => (r.id === saved.id ? saved : r)) : [...prev, saved]));
-
-          // Old image replaced or removed → delete it from storage.
-          if (existing?.imagePath && existing.imagePath !== imagePath) {
-            db.removeImages([existing.imagePath]).catch(console.error);
-          }
-          notify(existing ? 'Receipt updated' : `Added “${draft.name}”`);
-          return true;
-        } catch (e) {
-          if (uploadedPath) db.removeImages([uploadedPath]).catch(console.error);
-          if (e instanceof db.ReceiptConflictError) {
-            // Load the newer version; the form stays open, so saving again overwrites it on purpose.
-            void reload(client.id, { silent: true });
-            notify(`${e.message}. The latest version is loaded — save again to replace it.`, 'error');
-            return false;
-          }
-          notify(`Couldn’t save: ${errMsg(e)}`, 'error');
-          return false;
-        }
-      },
-
-      deleteReceipt: (receipt) => {
-        const row = stored.find((r) => r.id === receipt.id);
-        if (!row) return;
-        setStored((prev) => prev.filter((r) => r.id !== row.id));
-        db.deleteReceipt(row.id).then(
-          () => {
-            if (row.imagePath) scheduleImageDelete(row.imagePath);
-            notify(`Deleted “${row.name}”`, 'info', async () => {
-              if (row.imagePath) cancelImageDelete(row.imagePath);
-              dismissToast();
-              try {
-                const restored = await db.upsertReceipt(row);
-                setStored((prev) => (prev.some((r) => r.id === restored.id) ? prev : [...prev, restored]));
-              } catch (e) {
-                notify(`Couldn’t restore: ${errMsg(e)}`, 'error');
-              }
-            });
-          },
-          (e) => {
-            setStored((prev) => (prev.some((r) => r.id === row.id) ? prev : [...prev, row]));
-            notify(`Couldn’t delete: ${errMsg(e)}`, 'error');
-          },
-        );
-      },
-
-      deleteReceipts: (list) => {
-        const ids = new Set(list.map((r) => r.id));
-        const rows = stored.filter((r) => ids.has(r.id));
-        if (!rows.length) return;
-        setStored((prev) => prev.filter((r) => !ids.has(r.id)));
-        db.deleteReceipts([...ids]).then(
-          () => {
-            const paths = rows.flatMap((r) => (r.imagePath ? [r.imagePath] : []));
-            const timer = paths.length
-              ? setTimeout(() => db.removeImages(paths).catch(console.error), IMAGE_DELETE_DELAY_MS)
-              : undefined;
-            notify(`Deleted ${rows.length} receipt${rows.length === 1 ? '' : 's'}`, 'info', async () => {
-              clearTimeout(timer);
-              dismissToast();
-              try {
-                const restored = await db.restoreReceipts(rows);
-                setStored((prev) => [...prev.filter((r) => !ids.has(r.id)), ...restored]);
-              } catch (e) {
-                notify(`Couldn’t restore: ${errMsg(e)}`, 'error');
-              }
-            });
-          },
-          (e) => {
-            setStored((prev) => [...prev.filter((r) => !ids.has(r.id)), ...rows]);
-            notify(`Couldn’t delete: ${errMsg(e)}`, 'error');
-          },
-        );
-      },
-
-      moveReceipts: async (list, categoryName) => {
-        const category = categoryList.find((c) => c.name === categoryName);
-        if (!category) return false;
-        try {
-          const updated = await db.setReceiptsCategory(client.id, list.map((r) => r.id), category.id);
-          const byId = new Map(updated.map((r) => [r.id, r]));
-          setStored((prev) => prev.map((r) => byId.get(r.id) ?? r));
-          notify(`Moved ${updated.length} receipt${updated.length === 1 ? '' : 's'} to “${category.name}”`);
-          return true;
-        } catch (e) {
-          notify(`Couldn’t move receipts: ${errMsg(e)}`, 'error');
-          return false;
-        }
-      },
+      ...receiptActions({
+        userId,
+        clientId: client.id,
+        categoryList,
+        setCategoryList,
+        stored,
+        setStored,
+        reloadSilently: () => void reload(client.id, { silent: true }),
+        notify,
+        dismissToast,
+        showLocal,
+        scheduleImageDelete,
+        cancelImageDelete,
+      }),
 
       exportList: async (list, format, label) => {
         try {
