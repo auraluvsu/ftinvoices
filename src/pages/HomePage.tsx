@@ -9,18 +9,31 @@ import { QuarterChart } from '../components/QuarterChart';
 import { ImageModal } from '../components/ImageModal';
 import { EditReceiptModal } from '../components/EditReceiptModal';
 import { catVar, NEUTRAL_COLOR } from '../lib/color';
+import { taxYearLabel, taxYearOf } from '../lib/taxYear';
+import { ExportMenu } from '../components/ExportMenu';
 
-type Period = 'quarter' | 'year' | 'all';
+type Period = 'quarter' | 'year' | 'taxyear' | 'all';
 const PERIODS: { value: Period; label: string }[] = [
   { value: 'quarter', label: 'This quarter' },
   { value: 'year', label: 'This year' },
+  { value: 'taxyear', label: 'This tax year' },
   { value: 'all', label: 'All time' },
 ];
+
+type YearMode = 'calendar' | 'tax';
+const YEAR_MODE_KEY = 'ftinvoices.yearMode';
+const readYearMode = (): YearMode => {
+  try {
+    return localStorage.getItem(YEAR_MODE_KEY) === 'tax' ? 'tax' : 'calendar';
+  } catch {
+    return 'calendar';
+  }
+};
 const MAX_CATEGORIES = 8;
 const TOP_BILLS = 5;
 
 export function HomePage() {
-  const { receipts, stagger, categories: allCategories, categoryColor, saveReceipt, notify } = useAppData();
+  const { receipts, stagger, categories: allCategories, categoryColor, saveReceipt, notify, exportList } = useAppData();
   const [period, setPeriod] = useState<Period>('quarter');
   const [viewing, setViewing] = useState<Receipt | null>(null);
   const [editing, setEditing] = useState<Receipt | null>(null);
@@ -35,12 +48,33 @@ export function HomePage() {
   const change = prevTotal ? ((qt.total - prevTotal) / prevTotal) * 100 : null;
   const daysLeft = Math.ceil((quarterEndExclusive(current.start).getTime() - new Date(today + 'T00:00:00').getTime()) / 86_400_000);
 
-  const ytd = useMemo(() => sumTotals(receipts.filter((r) => r.date.startsWith(year))), [receipts, year]);
+  // The year tiles show the calendar year or the UK tax year (6 Apr – 5 Apr), remembered per device.
+  const taxYear = taxYearOf(today);
+  const [yearMode, setYearModeState] = useState<YearMode>(readYearMode);
+  const setYearMode = (m: YearMode) => {
+    setYearModeState(m);
+    try {
+      localStorage.setItem(YEAR_MODE_KEY, m);
+    } catch {
+      /* not remembered */
+    }
+  };
+  const yearName = yearMode === 'tax' ? `tax year ${taxYearLabel(taxYear)}` : year;
+  const ytd = useMemo(
+    () => sumTotals(receipts.filter((r) => (yearMode === 'tax' ? taxYearOf(r.date) === taxYear : r.date.startsWith(year)))),
+    [receipts, year, yearMode, taxYear],
+  );
 
   const periodReceipts = useMemo(
     () =>
-      period === 'quarter' ? current.receipts : period === 'year' ? receipts.filter((r) => r.date.startsWith(year)) : receipts,
-    [period, current.receipts, receipts, year],
+      period === 'quarter'
+        ? current.receipts
+        : period === 'year'
+          ? receipts.filter((r) => r.date.startsWith(year))
+          : period === 'taxyear'
+            ? receipts.filter((r) => taxYearOf(r.date) === taxYear)
+            : receipts,
+    [period, current.receipts, receipts, year, taxYear],
   );
   const periodTotal = sumTotals(periodReceipts).total;
 
@@ -66,6 +100,14 @@ export function HomePage() {
   );
 
   const periodName = PERIODS.find((p) => p.value === period)!.label.toLowerCase();
+  const periodFileLabel =
+    period === 'quarter'
+      ? `quarter-${current.label.toLowerCase().replace(/\W+/g, '-')}`
+      : period === 'year'
+        ? `year-${year}`
+        : period === 'taxyear'
+          ? `tax-year-${taxYearLabel(taxYear).replace('/', '-')}`
+          : 'receipts';
 
   if (!receipts.length) {
     return (
@@ -118,12 +160,17 @@ export function HomePage() {
           <small className="muted">For your next VAT return</small>
         </div>
         <div className="stat">
-          <span className="muted">Spend in {year}</span>
+          <span className="muted">Spend in {yearName}</span>
           <strong>{formatMoney(ytd.total)}</strong>
-          <small className="muted">{ytd.count} receipts</small>
+          <small className="muted">
+            {ytd.count} receipts ·{' '}
+            <button type="button" className="link-btn" onClick={() => setYearMode(yearMode === 'tax' ? 'calendar' : 'tax')}>
+              {yearMode === 'tax' ? 'Show calendar year' : 'Show tax year'}
+            </button>
+          </small>
         </div>
         <div className="stat">
-          <span className="muted">VAT paid in {year}</span>
+          <span className="muted">VAT paid in {yearName}</span>
           <strong>{formatMoney(ytd.vat)}</strong>
           <small className="muted">Net {formatMoney(ytd.net)}</small>
         </div>
@@ -131,6 +178,7 @@ export function HomePage() {
 
       <QuarterChart quarters={quarters} stagger={stagger} />
 
+      <div className="period-row">
       <div className="tabs" role="tablist" aria-label="Period">
         {PERIODS.map((p) => (
           <button
@@ -144,6 +192,13 @@ export function HomePage() {
             {p.label}
           </button>
         ))}
+      </div>
+        <ExportMenu
+          small
+          label="Export period"
+          disabled={!periodReceipts.length}
+          onExport={(fmt) => exportList(periodReceipts, fmt, periodFileLabel)}
+        />
       </div>
 
       <div className="home-grid">
