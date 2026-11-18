@@ -14,7 +14,7 @@ type ClientRow = Pick<Tables<'clients'>, 'id' | 'name' | 'vat_number' | 'vat_qua
 type CategoryRow = Pick<Tables<'categories'>, 'id' | 'client_id' | 'name' | 'color'>;
 type ReceiptRow = Pick<
   Tables<'receipts'>,
-  'id' | 'client_id' | 'category_id' | 'name' | 'total' | 'vat' | 'date' | 'image_path' | 'created_at'
+  'id' | 'client_id' | 'category_id' | 'name' | 'total' | 'vat' | 'date' | 'image_path' | 'created_at' | 'updated_at'
 >;
 
 const toClient = (r: ClientRow): Client => ({
@@ -38,6 +38,7 @@ export const toStoredReceipt = (r: ReceiptRow): StoredReceipt => ({
   date: r.date,
   imagePath: r.image_path ?? undefined,
   createdAt: Date.parse(r.created_at),
+  updatedAt: r.updated_at,
 });
 
 const fromStoredReceipt = (r: StoredReceipt) => ({
@@ -117,11 +118,13 @@ export async function reassignReceipts(clientId: string, fromId: string, toId: s
 }
 
 // ---------- Receipts ----------
+const RECEIPT_COLUMNS = 'id,client_id,category_id,name,total,vat,date,image_path,created_at,updated_at';
+
 export async function listReceipts(clientId: string): Promise<StoredReceipt[]> {
   const rows = check(
     await supabase
       .from('receipts')
-      .select('id,client_id,category_id,name,total,vat,date,image_path,created_at')
+      .select(RECEIPT_COLUMNS)
       .eq('client_id', clientId)
       .order('date', { ascending: false }),
   );
@@ -133,9 +136,36 @@ export async function upsertReceipt(r: StoredReceipt): Promise<StoredReceipt> {
     await supabase
       .from('receipts')
       .upsert(fromStoredReceipt(r))
-      .select('id,client_id,category_id,name,total,vat,date,image_path,created_at')
+      .select(RECEIPT_COLUMNS)
       .single(),
   );
+  return toStoredReceipt(row);
+}
+
+/** Thrown when a receipt was changed or deleted elsewhere since it was loaded. */
+export class ReceiptConflictError extends Error {
+  constructor() {
+    super('This receipt was changed on another device or tab');
+    this.name = 'ReceiptConflictError';
+  }
+}
+
+/**
+ * Updates an existing receipt only if it still has the `updated_at` it was loaded with,
+ * so an old copy can't silently overwrite newer edits. Throws ReceiptConflictError otherwise.
+ */
+export async function updateReceipt(r: StoredReceipt, expectedUpdatedAt: string): Promise<StoredReceipt> {
+  const { id, ...fields } = fromStoredReceipt(r);
+  const row = check(
+    await supabase
+      .from('receipts')
+      .update(fields)
+      .eq('id', id)
+      .eq('updated_at', expectedUpdatedAt)
+      .select(RECEIPT_COLUMNS)
+      .maybeSingle(),
+  );
+  if (!row) throw new ReceiptConflictError();
   return toStoredReceipt(row);
 }
 

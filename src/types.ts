@@ -18,6 +18,8 @@ export interface Receipt {
   /** URL to display the image (short-lived signed URL, or a local data URL right after upload) */
   image?: string;
   createdAt: number;
+  /** Server's updated_at, exactly as returned; used to detect edits made elsewhere. */
+  updatedAt?: string;
 }
 
 /** What the receipt form hands to the store when saving. */
