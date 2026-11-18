@@ -67,6 +67,27 @@ export interface FiledQuarter {
   /** Box 4 and Box 7 as filed */
   box4: number;
   box7: number;
+  /** Box 1 and Box 6 as filed; null for quarters filed before income was recorded */
+  box1: number | null;
+  box6: number | null;
+}
+
+/** Money in: a sale or fee, entered from your own invoice. */
+export interface Income {
+  id: string;
+  clientId: string;
+  customer: string;
+  /** Invoice number or similar */
+  reference?: string;
+  description?: string;
+  /** Amount before VAT */
+  net: number;
+  /** VAT charged */
+  vat: number;
+  vatRate: VatRate;
+  /** YYYY-MM-DD */
+  date: string;
+  createdAt: number;
 }
 
 /** A regular bill, offered for review each time it's due. */

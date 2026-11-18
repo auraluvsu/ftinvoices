@@ -2,6 +2,7 @@ import { createContext, useContext } from 'react';
 import type { Category, Client, FiledQuarter, NewCategory, Receipt, ReceiptDraft, RecurringExpense } from './types';
 import type { ExportFormat } from './lib/export';
 import type { QuarterStagger } from './lib/quarters';
+import type { VatReturnBoxes } from './lib/vatReturn';
 
 export interface Toast {
   id: number;
@@ -47,7 +48,7 @@ export interface AppData {
   /** The filed quarter that locks receipts on this date, if any. */
   lockedBy: (date: string) => FiledQuarter | undefined;
   /** Marks a quarter as filed, storing its Box 4 and Box 7. `label` is for the toast. */
-  fileQuarter: (period: { from: string; to: string }, boxes: { box4: number; box7: number }, label: string) => Promise<boolean>;
+  fileQuarter: (period: { from: string; to: string }, boxes: VatReturnBoxes, label: string) => Promise<boolean>;
   unfileQuarter: (filed: FiledQuarter, label: string) => Promise<boolean>;
   /** Recurring expenses, soonest first. */
   recurring: RecurringExpense[];

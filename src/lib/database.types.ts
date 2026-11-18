@@ -72,7 +72,9 @@ export type Database = {
       };
       filed_quarters: {
         Row: {
+          box1: number | null;
           box4: number;
+          box6: number | null;
           box7: number;
           client_id: string;
           filed_at: string;
@@ -82,7 +84,9 @@ export type Database = {
           user_id: string;
         };
         Insert: {
+          box1?: number | null;
           box4: number;
+          box6?: number | null;
           box7: number;
           client_id: string;
           filed_at?: string;
@@ -92,7 +96,9 @@ export type Database = {
           user_id?: string;
         };
         Update: {
+          box1?: number | null;
           box4?: number;
+          box6?: number | null;
           box7?: number;
           client_id?: string;
           filed_at?: string;
@@ -164,6 +170,59 @@ export type Database = {
           },
           {
             foreignKeyName: 'recurring_expenses_client_id_fkey';
+            columns: ['client_id'];
+            isOneToOne: false;
+            referencedRelation: 'clients';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      income: {
+        Row: {
+          client_id: string;
+          created_at: string;
+          customer: string;
+          date: string;
+          description: string | null;
+          id: string;
+          net: number;
+          reference: string | null;
+          updated_at: string;
+          user_id: string;
+          vat: number;
+          vat_rate: string;
+        };
+        Insert: {
+          client_id: string;
+          created_at?: string;
+          customer: string;
+          date: string;
+          description?: string | null;
+          id?: string;
+          net: number;
+          reference?: string | null;
+          updated_at?: string;
+          user_id?: string;
+          vat?: number;
+          vat_rate?: string;
+        };
+        Update: {
+          client_id?: string;
+          created_at?: string;
+          customer?: string;
+          date?: string;
+          description?: string | null;
+          id?: string;
+          net?: number;
+          reference?: string | null;
+          updated_at?: string;
+          user_id?: string;
+          vat?: number;
+          vat_rate?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'income_client_id_fkey';
             columns: ['client_id'];
             isOneToOne: false;
             referencedRelation: 'clients';

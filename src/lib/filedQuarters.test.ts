@@ -3,7 +3,7 @@ import { filedQuarterFor } from './filedQuarters';
 import { quarterPeriod, quarterStart } from './quarters';
 import type { FiledQuarter } from '../types';
 
-const q3: FiledQuarter = { id: 'f', clientId: 'c', start: '2026-07-01', end: '2026-09-30', filedAt: '', box4: 0, box7: 0 };
+const q3: FiledQuarter = { id: 'f', clientId: 'c', start: '2026-07-01', end: '2026-09-30', filedAt: '', box4: 0, box7: 0, box1: null, box6: null };
 
 describe('filedQuarterFor', () => {
   it('matches dates inside the period, including both ends', () => {
