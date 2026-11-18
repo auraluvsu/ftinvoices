@@ -25,7 +25,7 @@ Built with React + TypeScript (Vite), with data stored in Supabase behind Google
 **Overview and reports**
 - Overview page: spend and VAT this quarter and this year, a spend-per-quarter chart, spend by category, and biggest bills.
 - Quarterly review: totals per VAT quarter, change on the previous quarter, month-by-month and category breakdowns.
-- Export everything, a month, a filtered view or a quarter as **.xlsx** (summary sheet + per-month sheets), **CSV**, or **JSON** (includes images). Exports carry the client's name and VAT number.
+- Export everything, a month, a filtered view or a quarter as **.xlsx** (summary sheet + per-month sheets), **CSV**, **JSON** (includes images), or a **zip of photos** named like `2026-11-02_Shell_£60.00.jpg`. Exports carry the client's name and VAT number.
 
 **General**
 - Light (cream + mint) and dark (charcoal + jade) themes, following the system or set by hand.
