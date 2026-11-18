@@ -151,6 +151,37 @@ export async function deleteReceipt(id: string): Promise<void> {
   check(await supabase.from('receipts').delete().eq('id', id));
 }
 
+// ---------- Several receipts at once ----------
+export async function deleteReceipts(ids: string[]): Promise<void> {
+  if (ids.length) check(await supabase.from('receipts').delete().in('id', ids));
+}
+
+/** Re-inserts receipts exactly as they were (Undo after a bulk delete). */
+export async function restoreReceipts(rows: StoredReceipt[]): Promise<StoredReceipt[]> {
+  if (!rows.length) return [];
+  const data = check(
+    await supabase
+      .from('receipts')
+      .upsert(rows.map(fromStoredReceipt))
+      .select('id,client_id,category_id,name,total,vat,date,image_path,created_at'),
+  );
+  return (data as ReceiptRow[]).map(toStoredReceipt);
+}
+
+/** Moves receipts of one client to another of its categories; returns the updated rows. */
+export async function setReceiptsCategory(clientId: string, ids: string[], categoryId: string): Promise<StoredReceipt[]> {
+  if (!ids.length) return [];
+  const data = check(
+    await supabase
+      .from('receipts')
+      .update({ category_id: categoryId })
+      .eq('client_id', clientId)
+      .in('id', ids)
+      .select('id,client_id,category_id,name,total,vat,date,image_path,created_at'),
+  );
+  return (data as ReceiptRow[]).map(toStoredReceipt);
+}
+
 // ---------- Images (private bucket) ----------
 export const imagePathFor = (userId: string, clientId: string, receiptId: string) =>
   // Timestamp keeps paths unique, so a replaced image never reuses a cached URL.
