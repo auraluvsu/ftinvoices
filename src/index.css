@@ -367,6 +367,8 @@ input[type='number']::-webkit-inner-spin-button { opacity: .4; }
 .filing-confirm span { flex: 1 1 260px; }
 .filing .btn svg { vertical-align: -2px; margin-right: 4px; }
 .receipt-lock { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; color: var(--muted); }
+/* Groups the receipt form's inputs so they can be disabled together; no box of its own. */
+.form-fields { display: contents; border: 0; margin: 0; padding: 0; min-width: 0; }
 .locked-note { margin: 0; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--surface-2); font-size: .85rem; display: flex; gap: 8px; align-items: flex-start; }
 .locked-note svg { flex: none; margin-top: 2px; color: var(--accent); }
 /* ---------- Printable report ---------- */
