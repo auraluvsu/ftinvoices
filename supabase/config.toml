@@ -1,0 +1,8 @@
+# Supabase CLI settings used by `supabase functions deploy`.
+project_id = "ftinvoices"
+
+[functions.scan-receipt]
+# The gateway's legacy JWT check can reject valid sign-ins on projects using the newer
+# JWT signing keys. The function checks the signed-in user itself (see index.ts),
+# so unauthenticated requests are still refused.
+verify_jwt = false
