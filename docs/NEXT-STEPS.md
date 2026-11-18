@@ -68,5 +68,4 @@ These came up while planning and haven't been built yet.
 
 **Reports**
 - Printable / PDF quarter or year report for the client or accountant.
-- Zip export with images named like `2026-11-02_Shell_£60.00.jpg`.
 - Income and sales invoices, for profit figures and the sales boxes on the VAT return.
