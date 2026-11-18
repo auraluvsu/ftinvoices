@@ -111,6 +111,66 @@ export type Database = {
           },
         ];
       };
+      recurring_expenses: {
+        Row: {
+          anchor_day: number;
+          category_id: string | null;
+          client_id: string;
+          created_at: string;
+          frequency: string;
+          id: string;
+          name: string;
+          next_date: string;
+          total: number;
+          user_id: string;
+          vat: number;
+          vat_rate: string;
+        };
+        Insert: {
+          anchor_day: number;
+          category_id?: string | null;
+          client_id: string;
+          created_at?: string;
+          frequency: string;
+          id?: string;
+          name: string;
+          next_date: string;
+          total: number;
+          user_id?: string;
+          vat?: number;
+          vat_rate?: string;
+        };
+        Update: {
+          anchor_day?: number;
+          category_id?: string | null;
+          client_id?: string;
+          created_at?: string;
+          frequency?: string;
+          id?: string;
+          name?: string;
+          next_date?: string;
+          total?: number;
+          user_id?: string;
+          vat?: number;
+          vat_rate?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'recurring_expenses_category_id_client_id_fkey';
+            columns: ['category_id', 'client_id'];
+            isOneToOne: false;
+            referencedRelation: 'categories';
+            referencedColumns: ['id', 'client_id'];
+          },
+          {
+            foreignKeyName: 'recurring_expenses_client_id_fkey';
+            columns: ['client_id'];
+            isOneToOne: false;
+            referencedRelation: 'clients';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       receipts: {
         Row: {
           category_id: string;
